@@ -261,7 +261,7 @@ export default function ERBilling() {
           </div>
 
           <div class="totals">
-            <div>Net Amount:</div><div>₹${data.discounted_total.toFixed(2)}</div>
+            <div>Net Amount:</div><div>₹${data.net_amount.toFixed(2)}</div>
           </div>
 
           <div class="line"></div>
@@ -292,7 +292,7 @@ export default function ERBilling() {
       ...form,
       procedures: cleanProcedures,
       total: totalAmount,
-      discounted_total: finalAmount,
+      net_amount: finalAmount,
       discount_amount: discountAmount,
       discount_type: discountType,
       discount_value: discountValue,
@@ -307,7 +307,7 @@ export default function ERBilling() {
         ...form,
         procedures: selectedProcedures,
         total: totalAmount,
-        discounted_total: finalAmount,
+        net_amount: finalAmount,
         discount_amount: discountAmount,
         discount_type: discountType,
         discount_value: discountValue,

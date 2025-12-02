@@ -147,27 +147,29 @@ export default function PrintBill() {
     fetchBilledPatients();
   }, [date]);
 
-  const fetchBilledPatients = async () => {
-    try {
-      const formattedDate = date.toISOString().split("T")[0];
+const fetchBilledPatients = async () => {
+  try {
+    const formattedDate = date.toISOString().split("T")[0];
 
-      const result = await apiRequest(
-        `${ERbaseurl}printbill/?date=${formattedDate}`,
-        "GET"
+    const result = await apiRequest(
+      `${ERbaseurl}printbill/?date=${formattedDate}`,
+      "GET"
+    );
+
+    if (result.success) {
+      const billed = (result.data || []).filter(
+        (item) => ["Billed", "paid"].includes(item.billing_status)
       );
 
-      if (result.success) {
-        const billed = (result.data || []).filter(
-          (item) => item.billing_status === "Billed"
-        );
-        setBillingData(billed);
-      } else {
-        console.error("Failed to fetch billing data:", result.error);
-      }
-    } catch (err) {
-      console.error("Error fetching billing data:", err);
+      setBillingData(billed);
+    } else {
+      console.error("Failed to fetch billing data:", result.error);
     }
-  };
+  } catch (err) {
+    console.error("Error fetching billing data:", err);
+  }
+};
+
 
   const printBill = (data) => {
 
@@ -298,7 +300,7 @@ export default function PrintBill() {
           </div>
 
           <div class="totals">
-            <div>Net Amount:</div><div>₹${data.discounted_total.toFixed(2)}</div>
+            <div>Net Amount:</div><div>₹${data.net_amount.toFixed(2)}</div>
           </div>
 
           <div class="line"></div>
@@ -380,7 +382,7 @@ export default function PrintBill() {
                   <Td>{item.patientname}</Td>
                   <Td>{item.doctorname}</Td>
                   <Td><Badge>{item.billnumber}</Badge></Td>
-                  <Td><TotalAmount>₹{Number(item.discounted_total).toFixed(2)}</TotalAmount></Td>
+                  <Td><TotalAmount>₹{Number(item.net_amount).toFixed(2)}</TotalAmount></Td>
                   <Td>
                     <PrintButton onClick={() => printBill(item)}>
                       <span>🖨️</span> Print Bill

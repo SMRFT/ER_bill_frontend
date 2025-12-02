@@ -342,7 +342,8 @@ else if (userRole === "ER Pharmacy") {
   navigationItems.push({
     section: 'Department',
     items: [
-      { path: '/Pharmacy', icon: '💊', text: 'Pharmacy' }
+      { path: '/Pharmacy', icon: '💊', text: 'Pharmacy' },
+      { path: '/AccountSummary', icon: '🧾', text: 'Account Summary' }
     ]
   });
 }
