@@ -42,7 +42,6 @@ import {
 } from "../Styles/globalStyles";
 
 import apiRequest from "./apiRequest";
-
 const ERbaseurl = process.env.REACT_APP_BACKEND_ER_BASE_URL;
 
 export default function AccountSummary() {
@@ -91,7 +90,7 @@ export default function AccountSummary() {
       } else {
         showToast("Failed to fetch account summary", "error");
       }
-    } catch (err) {
+    } catch {
       showToast("API Error", "error");
     } finally {
       setLoading(false);
@@ -111,12 +110,8 @@ export default function AccountSummary() {
 
   const calculateStats = () => {
     const totalRecords = summaryData.length;
-    const totalAmount = summaryData.reduce((sum, item) => sum + (item.total || 0), 0);
-    const totalDiscounted = summaryData.reduce(
-      (sum, item) => sum + (item.net_amount || 0),
-      0
-    );
-
+    const totalAmount = summaryData.reduce((s, i) => s + (i.total || 0), 0);
+    const totalDiscounted = summaryData.reduce((s, i) => s + (i.net_amount || 0), 0);
     return { totalRecords, totalAmount, totalDiscounted };
   };
 
@@ -138,37 +133,34 @@ export default function AccountSummary() {
     });
   };
 
-  // Format payment methods for display
+  // DISPLAY FORMAT (table)
   const formatPaymentMethods = (paymentMode) => {
-    if (!paymentMode || (Array.isArray(paymentMode) && paymentMode.length === 0)) {
+    if (!paymentMode || !Array.isArray(paymentMode) || paymentMode.length === 0) {
       return "Not Paid";
     }
 
-    if (Array.isArray(paymentMode)) {
-      return paymentMode
-        .map((pm) => `${pm.method.toUpperCase()}: ${formatCurrency(pm.amount)}`)
-        .join(", ");
-    }
-
-    return "Not Paid";
+    return paymentMode
+      .map(
+        (pm) =>
+          `${pm.method.toUpperCase()}: ₹${Number(pm.amount).toLocaleString("en-IN")}`
+      )
+      .join(", ");
   };
 
-  // Format payment methods for Excel (plain text)
-  const formatPaymentMethodsExcel = (paymentMode) => {
-    if (!paymentMode || (Array.isArray(paymentMode) && paymentMode.length === 0)) {
+  // PDF FORMAT (multiline)
+  const formatPaymentMethodsPDF = (paymentMode) => {
+    if (!paymentMode || !Array.isArray(paymentMode) || paymentMode.length === 0)
       return "Not Paid";
-    }
 
-    if (Array.isArray(paymentMode)) {
-      return paymentMode
-        .map((pm) => `${pm.method.toUpperCase()}: ₹${pm.amount}`)
-        .join(", ");
-    }
-
-    return "Not Paid";
+    return paymentMode
+      .map(
+        (pm) =>
+          `${pm.method.toUpperCase()} : ₹${Number(pm.amount).toLocaleString("en-IN")}`
+      )
+      .join("\n"); // <-- MULTI-LINE FIX
   };
 
-  // ⭐⭐⭐ EXCEL DOWNLOAD
+  // ---------------- Excel Download ----------------
   const downloadExcel = () => {
     import("xlsx").then((xlsx) => {
       const sheetData = summaryData.map((item) => ({
@@ -179,25 +171,23 @@ export default function AccountSummary() {
         Total: item.total,
         Discount: item.discount_amount,
         NetAmount: item.net_amount,
-        PaymentMethod: formatPaymentMethodsExcel(item.payment_mode),
+        PaymentMethod: formatPaymentMethods(item.payment_mode),
         Status: item.billing_status,
       }));
 
-      const worksheet = xlsx.utils.json_to_sheet(sheetData);
+      const sheet = xlsx.utils.json_to_sheet(sheetData);
       const workbook = xlsx.utils.book_new();
-      xlsx.utils.book_append_sheet(workbook, worksheet, "AccountSummary");
-
+      xlsx.utils.book_append_sheet(workbook, sheet, "AccountSummary");
       xlsx.writeFile(workbook, "AccountSummary.xlsx");
     });
   };
 
-  // ⭐⭐⭐ PDF DOWNLOAD
+  // ---------------- PDF Download ----------------
   const downloadPDF = async () => {
     const jsPDFModule = await import("jspdf");
     const autoTable = await import("jspdf-autotable");
 
     const doc = new jsPDFModule.jsPDF();
-
     doc.text("Account Summary", 14, 15);
 
     const tableColumn = [
@@ -220,7 +210,7 @@ export default function AccountSummary() {
       item.total,
       item.discount_amount,
       item.net_amount,
-      formatPaymentMethodsExcel(item.payment_mode),
+      formatPaymentMethodsPDF(item.payment_mode), // FIX APPLIED HERE
       item.billing_status,
     ]);
 
@@ -228,7 +218,14 @@ export default function AccountSummary() {
       head: [tableColumn],
       body: tableRows,
       startY: 25,
-      styles: { fontSize: 8 },
+      styles: {
+        fontSize: 8,
+        cellWidth: "wrap",
+        overflow: "linebreak",
+      },
+      columnStyles: {
+        7: { cellWidth: 40 }, // Payment Method wider
+      },
       headStyles: { fillColor: [22, 160, 133] },
     });
 
@@ -247,7 +244,7 @@ export default function AccountSummary() {
         </ToastContainer>
       )}
 
-      {/* ---------------- Header + Download Buttons ---------------- */}
+      {/* HEADER & DOWNLOAD BUTTONS */}
       <HeaderSection>
         <div>
           <PageTitle>Account Summary</PageTitle>
@@ -264,7 +261,6 @@ export default function AccountSummary() {
               borderRadius: "8px",
               border: "none",
               cursor: "pointer",
-              height: "44px",
             }}
           >
             Download Excel
@@ -279,7 +275,6 @@ export default function AccountSummary() {
               borderRadius: "8px",
               border: "none",
               cursor: "pointer",
-              height: "44px",
             }}
           >
             Download PDF
@@ -287,7 +282,7 @@ export default function AccountSummary() {
         </div>
       </HeaderSection>
 
-      {/* ---------------- Filters ---------------- */}
+      {/* FILTERS */}
       <FilterCard>
         <FilterGrid>
           <FormGroup>
@@ -330,25 +325,25 @@ export default function AccountSummary() {
         </FilterGrid>
       </FilterCard>
 
-      {/* ---------------- Stats ---------------- */}
+      {/* STATS */}
       <StatsRow>
-        <StatCard gradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)">
+        <StatCard gradient="linear-gradient(135deg, #667eea, #764ba2)">
           <StatValue>{stats.totalRecords}</StatValue>
           <StatLabel>Total Records</StatLabel>
         </StatCard>
 
-        <StatCard gradient="linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)">
+        <StatCard gradient="linear-gradient(135deg, #3b82f6, #1d4ed8)">
           <StatValue>{formatCurrency(stats.totalAmount)}</StatValue>
           <StatLabel>Total Amount</StatLabel>
         </StatCard>
 
-        <StatCard gradient="linear-gradient(135deg, #10b981 0%, #059669 100%)">
+        <StatCard gradient="linear-gradient(135deg, #10b981, #059669)">
           <StatValue>{formatCurrency(stats.totalDiscounted)}</StatValue>
           <StatLabel>Net Total</StatLabel>
         </StatCard>
       </StatsRow>
 
-      {/* ---------------- Table ---------------- */}
+      {/* TABLE */}
       <TableCard>
         <TableHeader>
           <TableTitle>Billing Records</TableTitle>
@@ -380,6 +375,7 @@ export default function AccountSummary() {
                   <StyledTh>Status</StyledTh>
                 </tr>
               </thead>
+
               <tbody>
                 {summaryData.map((item, idx) => (
                   <tr key={idx}>
@@ -410,11 +406,13 @@ export default function AccountSummary() {
                     </StyledTd>
 
                     <StyledTd>
-                      <div style={{ 
-                        fontSize: "13px", 
-                        color: "#374151",
-                        lineHeight: "1.5"
-                      }}>
+                      <div
+                        style={{
+                          fontSize: "13px",
+                          color: "#374151",
+                          lineHeight: "1.5",
+                        }}
+                      >
                         {formatPaymentMethods(item.payment_mode)}
                       </div>
                     </StyledTd>

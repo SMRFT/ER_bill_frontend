@@ -76,9 +76,30 @@ export default function ERBilling() {
 
   /* ---------------- Fetch Data ---------------- */
   useEffect(() => {
-    fetchProcedures();
-    fetchDoctors();
-  }, []);
+  fetchNextBillNumber();
+  fetchProcedures();
+  fetchDoctors();
+}, []);
+
+
+
+  const fetchNextBillNumber = async () => {
+  try {
+    const result = await apiRequest(`${ERbaseurl}get_next_bill_number/`, "GET");
+
+    if (result.success) {
+      setForm((prev) => ({
+        ...prev,
+        billnumber: result.data.billNumber
+      }));
+    } else {
+      showToast("Unable to fetch bill number", "error");
+    }
+  } catch (error) {
+    console.error(error);
+    showToast("Error fetching bill number", "error");
+  }
+};
 
   const fetchProcedures = async () => {
   try {
@@ -112,6 +133,7 @@ export default function ERBilling() {
 };
 
 
+
   /* ---------------- Form Handler ---------------- */
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -119,15 +141,18 @@ export default function ERBilling() {
 
   /* ---------------- Add Procedure ---------------- */
   const handleProcedureSelect = (e) => {
-    const name = e.target.value;
-    if (!name) return;
+  const name = e.target.value;
+  if (!name) return;
 
-    const found = procedures.find((p) => p.procedure_name === name);
+  const found = procedures.find((p) => p.procedure_name === name);
 
-    if (found && !selectedProcedures.some((p) => p.procedure_name === name)) {
-      setSelectedProcedures([...selectedProcedures, found]);
-    }
-  };
+  if (found && !selectedProcedures.some((p) => p.procedure_name === name)) {
+    setSelectedProcedures([
+      ...selectedProcedures,
+      { ...found, unit: 1, total: Number(found.rate) }
+    ]);
+  }
+};
 
   const removeItem = (name) => {
     setSelectedProcedures(
@@ -136,10 +161,11 @@ export default function ERBilling() {
   };
 
   /* ---------------- Total Calculation ---------------- */
-  const totalAmount = selectedProcedures.reduce(
-    (sum, item) => sum + parseFloat(item.rate || 0),
-    0
-  );
+      const totalAmount = selectedProcedures.reduce(
+        (sum, item) => sum + Number(item.total || 0),
+        0
+      );
+
 
   /* ---------------- Discount Calculation ---------------- */
   useEffect(() => {
@@ -283,10 +309,13 @@ export default function ERBilling() {
   /* ---------------- Submit ---------------- */
   const handleSubmit = async () => {
   try {
-    const cleanProcedures = selectedProcedures.map(item => ({
-      procedure_name: item.procedure_name,
-      rate: Number(item.rate)
-    }));
+          const cleanProcedures = selectedProcedures.map(item => ({
+        procedure_name: item.procedure_name,
+        rate: Number(item.rate),
+        unit: Number(item.unit),
+        total: Number(item.total)
+      }));
+
 
     const payload = {
       ...form,
@@ -364,10 +393,15 @@ export default function ERBilling() {
             <Input name="uhid" value={form.uhid} onChange={handleChange} placeholder="Enter UHID" />
           </FormGroup>
 
-          <FormGroup>
+         <FormGroup>
             <Label>Bill Number</Label>
-            <Input name="billnumber" value={form.billnumber} onChange={handleChange} placeholder="Enter Bill Number" />
+            <Input
+              name="billnumber"
+              value={form.billnumber}
+              disabled
+            />
           </FormGroup>
+
 
           <FormGroup>
             <Label>Patient Name</Label>
@@ -429,29 +463,61 @@ export default function ERBilling() {
             <thead>
               <tr>
                 <Th>Procedure Name</Th>
-                <Th>Rate (₹)</Th>
+                <Th>Unit</Th>
+                <Th>Rate (₹)</Th>       
+                <Th>Total (₹)</Th>
                 <Th>Action</Th>
               </tr>
             </thead>
 
-            <tbody>
-              {selectedProcedures.map((item, idx) => (
-                <tr key={idx}>
-                  <Td>{item.procedure_name}</Td>
-                  <Td>₹ {Number(item.rate).toFixed(2)}</Td>
-                  <Td>
-                    <DangerButton onClick={() => removeItem(item.procedure_name)}>
-                      Remove
-                    </DangerButton>
-                  </Td>
-                </tr>
-              ))}
+           <tbody>
+          {selectedProcedures.map((item, idx) => (
+            <tr key={idx}>
+              {/* Procedure Name */}
+              <Td>{item.procedure_name}</Td>
 
-              <TotalRow>
-                <Td>Total Amount</Td>
-                <Td colSpan="2">₹ {totalAmount.toFixed(2)}</Td>
-              </TotalRow>
-            </tbody>
+              {/* Rate */}
+              <Td>₹ {Number(item.rate).toFixed(2)}</Td>
+
+              {/* UNIT Input */}
+              <Td>
+                <Input
+                  type="number"
+                  min="1"
+                  value={item.unit}
+                  onChange={(e) => {
+                    const unit = Number(e.target.value);
+                    setSelectedProcedures((prev) =>
+                      prev.map((p, i) =>
+                        i === idx
+                          ? { ...p, unit, total: unit * Number(p.rate) }
+                          : p
+                      )
+                    );
+                  }}
+                  style={{ width: "60px" }}
+                />
+              </Td>
+
+              {/* Total */}
+              <Td>₹ {Number(item.total).toFixed(2)}</Td>
+
+              {/* Remove */}
+              <Td>
+                <DangerButton onClick={() => removeItem(item.procedure_name)}>
+                  Remove
+                </DangerButton>
+              </Td>
+            </tr>
+          ))}
+
+          {/* Total Amount Row */}
+          <TotalRow>
+            <Td colSpan="3">Total Amount</Td>
+            <Td colSpan="2">₹ {totalAmount.toFixed(2)}</Td>
+          </TotalRow>
+        </tbody>
+
           </Table>
         )}
 
