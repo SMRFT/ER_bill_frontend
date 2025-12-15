@@ -31,32 +31,34 @@ export default function ERReport() {
 
   const [patients, setPatients] = useState([]);
 
-  const fetchReport = async () => {
-  try {
-    const response = await apiRequest(
-      `${ERbaseurl}erreport/?from_date=${fromDate}&to_date=${toDate}`,
-      "GET"
-    );
+ 
 
-    // Handle both response styles safely
-    const res = response?.data || response;
+    const fetchReport = async () => {
+    try {
+        const response = await apiRequest(
+        `${ERbaseurl}er_report/`,
+        "POST",
+        {
+            from_date: fromDate,
+            to_date: toDate,
+        }
+        );
 
-    if (res?.success) {
-      setSummary(res.summary || { male: 0, female: 0, total: 0 });
-      setPatients(res.patients || []);
-    } else {
-      setSummary({ male: 0, female: 0, total: 0 });
-      setPatients([]);
+        const res = response?.data || response;
+
+        if (res?.success) {
+        setSummary(res.summary);
+        setPatients(res.patients);
+        }
+    } catch (error) {
+        console.error("ER Report Error:", error);
     }
-  } catch (error) {
-    console.error("ER Report Error:", error);
-    setSummary({ male: 0, female: 0, total: 0 });
-    setPatients([]);
-  }
-};
+    };
+
 useEffect(() => {
   fetchReport();
 }, []);
+
 
 
 
