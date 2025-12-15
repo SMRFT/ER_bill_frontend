@@ -149,7 +149,7 @@ export default function ERBilling() {
   if (found && !selectedProcedures.some((p) => p.procedure_name === name)) {
     setSelectedProcedures([
       ...selectedProcedures,
-      { ...found, unit: 1, total: Number(found.rate) }
+      { ...found, unit: '', total: Number(found.rate) }
     ]);
   }
 };
@@ -189,15 +189,17 @@ export default function ERBilling() {
     }
 
     const procedureRows = data.procedures
-      .map(
-        (item, index) => `
-        <div style="display: flex; justify-content: space-between; font-size: 14px; margin: 2px 0;">
-          <div style="width: 10%; text-align: center;">${index + 1}</div>
-          <div style="width: 60%; padding-left: 5px;">${item.procedure_name}</div>
-          <div style="width: 30%; text-align: right;">₹${Number(item.rate).toFixed(2)}</div>
-        </div>`
-      )
-      .join("");
+  .map(
+    (item, index) => `
+    <div class="procedure-row">
+      <div class="col-sl">${index + 1}</div>
+      <div class="col-desc">${item.procedure_name}</div>
+      <div class="col-qty">${item.unit}</div>
+      <div class="col-rate">₹${Number(item.rate).toFixed(2)}</div>
+      <div class="col-amt">₹${Number(item.total).toFixed(2)}</div>
+    </div>`
+  )
+  .join("");
 
     printWindow.document.write(`
       <html>
@@ -224,16 +226,44 @@ export default function ERBilling() {
             .info-colon { text-align: center; }
             .info-value { text-align: right; }
 
-            .procedure-header {
+            .procedure-header,
+            .procedure-row {
               display: flex;
+              font-size: 13px;
+            }
+
+            .col-sl {
+              width: 8%;
+              text-align: center;
+            }
+
+            .col-desc {
+              width: 42%;
+              padding-left: 4px;
+            }
+
+            .col-qty {
+              width: 10%;
+              text-align: center;
+            }
+
+            .col-rate {
+              width: 20%;
+              text-align: right;
+            }
+
+            .col-amt {
+              width: 20%;
+              text-align: right;
+            }
+
+            .procedure-header {
               font-weight: bold;
               border-bottom: 1px solid #000;
               padding-bottom: 4px;
               margin-bottom: 4px;
             }
-            .procedure-header div:nth-child(1) { width: 10%; text-align: center; }
-            .procedure-header div:nth-child(2) { width: 60%; }
-            .procedure-header div:nth-child(3) { width: 30%; text-align: right; }
+
 
             .totals {
               font-weight: bold;
@@ -250,6 +280,7 @@ export default function ERBilling() {
             <div class="header-title">SHANMUGA HOSPITAL LIMITED</div>
             <div>51/24, Saradha College Road, Salem - 636007</div>
             <div>CIN: L85110TZ2020PLC033974</div>
+            <div>GST: 33ABDCS8326A1ZP</div>
           </div>
 
           <div class="line"></div>
@@ -260,19 +291,22 @@ export default function ERBilling() {
 
           <div class="info-table">
             <div class="info-label">Bill Number</div><div class="info-colon">:</div><div class="info-value">${data.billnumber}</div>
-            <div class="info-label">UHID</div><div class="info-colon">:</div><div class="info-value">${data.uhid}</div>
-            <div class="info-label">Date</div><div class="info-colon">:</div><div class="info-value">${data.date} ${data.time}</div>
+            <div class="info-label">OP Number</div><div class="info-colon">:</div><div class="info-value">${data.uhid}</div>
+            <div class="info-label">Bill Date</div><div class="info-colon">:</div><div class="info-value">${data.date} ${data.time}</div>
             <div class="info-label">Name</div><div class="info-colon">:</div><div class="info-value">${data.patientname}</div>
             <div class="info-label">Doctor</div><div class="info-colon">:</div><div class="info-value">${data.doctorname}</div>
           </div>
 
           <div class="line"></div>
 
-          <div class="procedure-header">
-            <div>No</div>
-            <div>Description</div>
-            <div>Amount</div>
+              <div class="procedure-header">
+            <div class="col-sl">Sl</div>
+            <div class="col-desc">Description</div>
+            <div class="col-qty">Qty</div>
+            <div class="col-rate">Rate</div>
+            <div class="col-amt">Amount</div>
           </div>
+
 
           ${procedureRows}
 
@@ -307,15 +341,14 @@ export default function ERBilling() {
   };
 
   /* ---------------- Submit ---------------- */
-  const handleSubmit = async () => {
+ const handleSubmit = async () => {
   try {
-          const cleanProcedures = selectedProcedures.map(item => ({
-        procedure_name: item.procedure_name,
-        rate: Number(item.rate),
-        unit: Number(item.unit),
-        total: Number(item.total)
-      }));
-
+    const cleanProcedures = selectedProcedures.map(item => ({
+      procedure_name: item.procedure_name,
+      rate: Number(item.rate),
+      unit: Number(item.unit),
+      total: Number(item.total)
+    }));
 
     const payload = {
       ...form,
@@ -345,15 +378,37 @@ export default function ERBilling() {
       };
 
       printBill(printData);
-    } else {
-      showToast("Error saving billing: " + (response.error || "Unknown error"), "error");
-    }
 
+      // ⭐⭐⭐ RESET FORM AFTER SUBMIT ⭐⭐⭐
+      setForm({
+        uhid: "",
+        patientname: "",
+        age: "",
+        gender: "",
+        phonenumber: "",
+        billnumber: "",
+        doctorname: "",
+      });
+
+      setSelectedProcedures([]);
+      setDiscountType("percentage");
+      setDiscountValue(0);
+
+      // Generate NEW automatic bill number
+      fetchNextBillNumber();
+
+    } else {
+      showToast(
+        "Error saving billing: " + (response.error || "Unknown error"),
+        "error"
+      );
+    }
   } catch (error) {
     console.error(error);
     showToast("Error saving billing. Please try again.", "error");
   }
 };
+
 
 
   /* ---------------- UI ---------------- */
@@ -470,53 +525,54 @@ export default function ERBilling() {
               </tr>
             </thead>
 
-           <tbody>
-          {selectedProcedures.map((item, idx) => (
-            <tr key={idx}>
-              {/* Procedure Name */}
-              <Td>{item.procedure_name}</Td>
+          <tbody>
+  {selectedProcedures.map((item, idx) => (
+    <tr key={idx}>
+      {/* Procedure Name */}
+      <Td>{item.procedure_name}</Td>
 
-              {/* Rate */}
-              <Td>₹ {Number(item.rate).toFixed(2)}</Td>
+      {/* UNIT Input (Correct position) */}
+      <Td>
+        <Input
+          type="text"
+         
+          value={item.unit}
+          onChange={(e) => {
+            const unit = Number(e.target.value);
+            setSelectedProcedures((prev) =>
+              prev.map((p, i) =>
+                i === idx
+                  ? { ...p, unit, total: unit * Number(p.rate) }
+                  : p
+              )
+            );
+          }}
+          style={{ width: "60px" }}
+        />
+      </Td>
 
-              {/* UNIT Input */}
-              <Td>
-                <Input
-                  type="number"
-                  min="1"
-                  value={item.unit}
-                  onChange={(e) => {
-                    const unit = Number(e.target.value);
-                    setSelectedProcedures((prev) =>
-                      prev.map((p, i) =>
-                        i === idx
-                          ? { ...p, unit, total: unit * Number(p.rate) }
-                          : p
-                      )
-                    );
-                  }}
-                  style={{ width: "60px" }}
-                />
-              </Td>
+      {/* Rate (Correct position) */}
+      <Td>₹ {Number(item.rate).toFixed(2)}</Td>
 
-              {/* Total */}
-              <Td>₹ {Number(item.total).toFixed(2)}</Td>
+      {/* Total */}
+      <Td>₹ {Number(item.total).toFixed(2)}</Td>
 
-              {/* Remove */}
-              <Td>
-                <DangerButton onClick={() => removeItem(item.procedure_name)}>
-                  Remove
-                </DangerButton>
-              </Td>
-            </tr>
-          ))}
+      {/* Remove */}
+      <Td>
+        <DangerButton onClick={() => removeItem(item.procedure_name)}>
+          Remove
+        </DangerButton>
+      </Td>
+    </tr>
+  ))}
 
-          {/* Total Amount Row */}
-          <TotalRow>
-            <Td colSpan="3">Total Amount</Td>
-            <Td colSpan="2">₹ {totalAmount.toFixed(2)}</Td>
-          </TotalRow>
-        </tbody>
+  {/* Total */}
+  <TotalRow>
+    <Td colSpan="3">Total Amount</Td>
+    <Td colSpan="2">₹ {totalAmount.toFixed(2)}</Td>
+  </TotalRow>
+</tbody>
+
 
           </Table>
         )}

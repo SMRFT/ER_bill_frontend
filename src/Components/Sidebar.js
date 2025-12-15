@@ -334,7 +334,9 @@ else if (userRole === "ER Nurse") {
     section: 'Emergency Department',
     items: [
       { path: '/ERBilling', icon: '💰', text: 'ER Billing' },
-      { path: '/PrintBill', icon: '🖨️', text: 'Print Bill' },   // FIXED!
+      { path: '/PrintBill', icon: '🖨️', text: 'Print Bill' }, 
+      { path: '/ERReport', icon: '📋', text: 'ER Report' }
+
     ]
   });
 } 
