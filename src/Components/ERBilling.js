@@ -35,6 +35,7 @@ export default function ERBilling() {
   const [form, setForm] = useState({
     uhid: "",
     patientname: "",
+    dateofbirth: "",
     age: "",
     gender: "",
     phonenumber: "",
@@ -76,83 +77,107 @@ export default function ERBilling() {
 
   /* ---------------- Fetch Data ---------------- */
   useEffect(() => {
-  fetchNextBillNumber();
-  fetchProcedures();
-  fetchDoctors();
-}, []);
-
-
+    fetchNextBillNumber();
+    fetchProcedures();
+    fetchDoctors();
+  }, []);
 
   const fetchNextBillNumber = async () => {
-  try {
-    const result = await apiRequest(`${ERbaseurl}get_next_bill_number/`, "GET");
+    try {
+      const result = await apiRequest(`${ERbaseurl}get_next_bill_number/`, "GET");
 
-    if (result.success) {
-      setForm((prev) => ({
-        ...prev,
-        billnumber: result.data.billNumber
-      }));
-    } else {
-      showToast("Unable to fetch bill number", "error");
+      if (result.success) {
+        setForm((prev) => ({
+          ...prev,
+          billnumber: result.data.billNumber
+        }));
+      } else {
+        showToast("Unable to fetch bill number", "error");
+      }
+    } catch (error) {
+      console.error(error);
+      showToast("Error fetching bill number", "error");
     }
-  } catch (error) {
-    console.error(error);
-    showToast("Error fetching bill number", "error");
-  }
-};
+  };
 
   const fetchProcedures = async () => {
-  try {
-    const result = await apiRequest(`${ERbaseurl}procedurelist/`, "GET");
+    try {
+      const result = await apiRequest(`${ERbaseurl}procedurelist/`, "GET");
 
-    if (result.success) {
-      setProcedures(result.data || []);
-    } else {
+      if (result.success) {
+        setProcedures(result.data || []);
+      } else {
+        showToast("Failed to fetch procedures", "error");
+      }
+    } catch (error) {
+      console.error("Error fetching procedures:", error);
       showToast("Failed to fetch procedures", "error");
     }
-  } catch (error) {
-    console.error("Error fetching procedures:", error);
-    showToast("Failed to fetch procedures", "error");
-  }
-};
-
+  };
 
   const fetchDoctors = async () => {
-  try {
-    const result = await apiRequest(`${ERbaseurl}doctorlist/`, "GET");
+    try {
+      const result = await apiRequest(`${ERbaseurl}doctorlist/`, "GET");
 
-    if (result.success) {
-      setDoctors(result.data || []);
-    } else {
+      if (result.success) {
+        setDoctors(result.data || []);
+      } else {
+        showToast("Failed to fetch doctors", "error");
+      }
+    } catch (error) {
+      console.error("Error fetching doctors:", error);
       showToast("Failed to fetch doctors", "error");
     }
-  } catch (error) {
-    console.error("Error fetching doctors:", error);
-    showToast("Failed to fetch doctors", "error");
-  }
-};
-
-
+  };
 
   /* ---------------- Form Handler ---------------- */
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  /* ---------------- Calculate Age from Date of Birth ---------------- */
+  const calculateAge = (dob) => {
+    if (!dob) return "";
+    
+    const birthDate = new Date(dob);
+    const today = new Date();
+    
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    // Adjust age if birthday hasn't occurred this year
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    return age;
+  };
+
+  const handleDOBChange = (e) => {
+    const dob = e.target.value;
+    const calculatedAge = calculateAge(dob);
+    
+    setForm({
+      ...form,
+      dateofbirth: dob,
+      age: calculatedAge
+    });
+  };
+
   /* ---------------- Add Procedure ---------------- */
   const handleProcedureSelect = (e) => {
-  const name = e.target.value;
-  if (!name) return;
+    const name = e.target.value;
+    if (!name) return;
 
-  const found = procedures.find((p) => p.procedure_name === name);
+    const found = procedures.find((p) => p.procedure_name === name);
 
-  if (found && !selectedProcedures.some((p) => p.procedure_name === name)) {
-    setSelectedProcedures([
-      ...selectedProcedures,
-      { ...found, unit: '', total: Number(found.rate) }
-    ]);
-  }
-};
+    if (found && !selectedProcedures.some((p) => p.procedure_name === name)) {
+      setSelectedProcedures([
+        ...selectedProcedures,
+        { ...found, unit: '', total: Number(found.rate) }
+      ]);
+    }
+  };
 
   const removeItem = (name) => {
     setSelectedProcedures(
@@ -161,11 +186,10 @@ export default function ERBilling() {
   };
 
   /* ---------------- Total Calculation ---------------- */
-      const totalAmount = selectedProcedures.reduce(
-        (sum, item) => sum + Number(item.total || 0),
-        0
-      );
-
+  const totalAmount = selectedProcedures.reduce(
+    (sum, item) => sum + Number(item.total || 0),
+    0
+  );
 
   /* ---------------- Discount Calculation ---------------- */
   useEffect(() => {
@@ -189,17 +213,17 @@ export default function ERBilling() {
     }
 
     const procedureRows = data.procedures
-  .map(
-    (item, index) => `
-    <div class="procedure-row">
-      <div class="col-sl">${index + 1}</div>
-      <div class="col-desc">${item.procedure_name}</div>
-      <div class="col-qty">${item.unit}</div>
-      <div class="col-rate">₹${Number(item.rate).toFixed(2)}</div>
-      <div class="col-amt">₹${Number(item.total).toFixed(2)}</div>
-    </div>`
-  )
-  .join("");
+      .map(
+        (item, index) => `
+        <div class="procedure-row">
+          <div class="col-sl">${index + 1}</div>
+          <div class="col-desc">${item.procedure_name}</div>
+          <div class="col-qty">${item.unit}</div>
+          <div class="col-rate">₹${Number(item.rate).toFixed(2)}</div>
+          <div class="col-amt">₹${Number(item.total).toFixed(2)}</div>
+        </div>`
+      )
+      .join("");
 
     printWindow.document.write(`
       <html>
@@ -224,7 +248,7 @@ export default function ERBilling() {
             }
             .info-label { font-weight: bold; text-align: left; }
             .info-colon { text-align: center; }
-            .info-value { text-align: right; }
+            .info-value { text-align: left; }
 
             .procedure-header,
             .procedure-row {
@@ -264,7 +288,6 @@ export default function ERBilling() {
               margin-bottom: 4px;
             }
 
-
             .totals {
               font-weight: bold;
               display: flex;
@@ -294,19 +317,19 @@ export default function ERBilling() {
             <div class="info-label">OP Number</div><div class="info-colon">:</div><div class="info-value">${data.uhid}</div>
             <div class="info-label">Bill Date</div><div class="info-colon">:</div><div class="info-value">${data.date} ${data.time}</div>
             <div class="info-label">Name</div><div class="info-colon">:</div><div class="info-value">${data.patientname}</div>
+            <div class="info-label">Age</div><div class="info-colon">:</div><div class="info-value">${data.age}</div>
             <div class="info-label">Doctor</div><div class="info-colon">:</div><div class="info-value">${data.doctorname}</div>
           </div>
 
           <div class="line"></div>
 
-              <div class="procedure-header">
+          <div class="procedure-header">
             <div class="col-sl">Sl</div>
             <div class="col-desc">Description</div>
             <div class="col-qty">Qty</div>
             <div class="col-rate">Rate</div>
             <div class="col-amt">Amount</div>
           </div>
-
 
           ${procedureRows}
 
@@ -341,75 +364,74 @@ export default function ERBilling() {
   };
 
   /* ---------------- Submit ---------------- */
- const handleSubmit = async () => {
-  try {
-    const cleanProcedures = selectedProcedures.map(item => ({
-      procedure_name: item.procedure_name,
-      rate: Number(item.rate),
-      unit: Number(item.unit),
-      total: Number(item.total)
-    }));
+  const handleSubmit = async () => {
+    try {
+      const cleanProcedures = selectedProcedures.map(item => ({
+        procedure_name: item.procedure_name,
+        rate: Number(item.rate),
+        unit: Number(item.unit),
+        total: Number(item.total)
+      }));
 
-    const payload = {
-      ...form,
-      procedures: cleanProcedures,
-      total: totalAmount,
-      net_amount: finalAmount,
-      discount_amount: discountAmount,
-      discount_type: discountType,
-      discount_value: discountValue,
-    };
-
-    const response = await apiRequest(`${ERbaseurl}erbilling/`, "POST", payload);
-
-    if (response.success) {
-      showToast("Billing saved successfully!", "success");
-
-      const printData = {
+      const payload = {
         ...form,
-        procedures: selectedProcedures,
+        procedures: cleanProcedures,
         total: totalAmount,
         net_amount: finalAmount,
         discount_amount: discountAmount,
         discount_type: discountType,
         discount_value: discountValue,
-        date: new Date().toLocaleDateString(),
-        time: new Date().toLocaleTimeString(),
       };
 
-      printBill(printData);
+      const response = await apiRequest(`${ERbaseurl}erbilling/`, "POST", payload);
 
-      // ⭐⭐⭐ RESET FORM AFTER SUBMIT ⭐⭐⭐
-      setForm({
-        uhid: "",
-        patientname: "",
-        age: "",
-        gender: "",
-        phonenumber: "",
-        billnumber: "",
-        doctorname: "",
-      });
+      if (response.success) {
+        showToast("Billing saved successfully!", "success");
 
-      setSelectedProcedures([]);
-      setDiscountType("percentage");
-      setDiscountValue(0);
+        const printData = {
+          ...form,
+          procedures: selectedProcedures,
+          total: totalAmount,
+          net_amount: finalAmount,
+          discount_amount: discountAmount,
+          discount_type: discountType,
+          discount_value: discountValue,
+          date: new Date().toLocaleDateString(),
+          time: new Date().toLocaleTimeString(),
+        };
 
-      // Generate NEW automatic bill number
-      fetchNextBillNumber();
+        printBill(printData);
 
-    } else {
-      showToast(
-        "Error saving billing: " + (response.error || "Unknown error"),
-        "error"
-      );
+        // ⭐⭐⭐ RESET FORM AFTER SUBMIT ⭐⭐⭐
+        setForm({
+          uhid: "",
+          patientname: "",
+          dateofbirth: "",
+          age: "",
+          gender: "",
+          phonenumber: "",
+          billnumber: "",
+          doctorname: "",
+        });
+
+        setSelectedProcedures([]);
+        setDiscountType("percentage");
+        setDiscountValue(0);
+
+        // Generate NEW automatic bill number
+        fetchNextBillNumber();
+
+      } else {
+        showToast(
+          "Error saving billing: " + (response.error || "Unknown error"),
+          "error"
+        );
+      }
+    } catch (error) {
+      console.error(error);
+      showToast("Error saving billing. Please try again.", "error");
     }
-  } catch (error) {
-    console.error(error);
-    showToast("Error saving billing. Please try again.", "error");
-  }
-};
-
-
+  };
 
   /* ---------------- UI ---------------- */
   return (
@@ -428,196 +450,209 @@ export default function ERBilling() {
       </ToastContainer>
 
       <PageContainer>
-      <Card>
-        <Title>ER Billing System</Title>
+        <Card>
+          <Title>ER Billing System</Title>
 
-        {/* Patient & Billing Information - 4 columns per row */}
-        <FormGrid>
-          <FormGroup>
-          <Label>Date</Label>
-          <Input
-            type="date"
-            value={new Date().toISOString().split("T")[0]}
-            disabled
-          />
-        </FormGroup>
+          {/* Patient & Billing Information - 4 columns per row */}
+          <FormGrid>
+            <FormGroup>
+              <Label>Date</Label>
+              <Input
+                type="date"
+                value={new Date().toISOString().split("T")[0]}
+                disabled
+              />
+            </FormGroup>
 
+            <FormGroup>
+              <Label>UHID Number</Label>
+              <Input name="uhid" value={form.uhid} onChange={handleChange} placeholder="Enter UHID" />
+            </FormGroup>
 
-          <FormGroup>
-            <Label>UHID Number</Label>
-            <Input name="uhid" value={form.uhid} onChange={handleChange} placeholder="Enter UHID" />
-          </FormGroup>
+            <FormGroup>
+              <Label>Bill Number</Label>
+              <Input
+                name="billnumber"
+                value={form.billnumber}
+                disabled
+              />
+            </FormGroup>
 
-         <FormGroup>
-            <Label>Bill Number</Label>
-            <Input
-              name="billnumber"
-              value={form.billnumber}
-              disabled
-            />
-          </FormGroup>
+            <FormGroup>
+              <Label>Patient Name</Label>
+              <Input name="patientname" value={form.patientname} onChange={handleChange} placeholder="Enter Patient Name" />
+            </FormGroup>
 
+            <FormGroup>
+              <Label>Date of Birth</Label>
+              <Input 
+                type="date" 
+                name="dateofbirth" 
+                value={form.dateofbirth} 
+                onChange={handleDOBChange} 
+                max={today}
+              />
+            </FormGroup>
 
-          <FormGroup>
-            <Label>Patient Name</Label>
-            <Input name="patientname" value={form.patientname} onChange={handleChange} placeholder="Enter Patient Name" />
-          </FormGroup>
+            <FormGroup>
+              <Label>Age</Label>
+              <Input 
+                type="number" 
+                name="age" 
+                value={form.age} 
+                readOnly 
+                placeholder="Auto-calculated" 
+                style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
+              />
+            </FormGroup>
 
-          <FormGroup>
-            <Label>Age</Label>
-            <Input type="number" name="age" value={form.age} onChange={handleChange} placeholder="Enter Age" />
-          </FormGroup>
+            <FormGroup>
+              <Label>Gender</Label>
+              <Select name="gender" value={form.gender} onChange={handleChange}>
+                <option value="">Select Gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </Select>
+            </FormGroup>
 
-          <FormGroup>
-            <Label>Gender</Label>
-            <Select name="gender" value={form.gender} onChange={handleChange}>
-              <option value="">Select Gender</option>
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
-              <option value="Other">Other</option>
-            </Select>
-          </FormGroup>
+            <FormGroup>
+              <Label>Doctor Name</Label>
+              <Select name="doctorname" value={form.doctorname} onChange={handleChange}>
+                <option value="">Select Doctor</option>
+                {doctors.map((item, index) => (
+                  <option key={index} value={item.doctor_name}>
+                    {item.doctor_name}
+                  </option>
+                ))}
+              </Select>
+            </FormGroup>
 
-          <FormGroup>
-            <Label>Doctor Name</Label>
-            <Select name="doctorname" value={form.doctorname} onChange={handleChange}>
-              <option value="">Select Doctor</option>
-              {doctors.map((item, index) => (
-                <option key={index} value={item.doctor_name}>
-                  {item.doctor_name}
-                </option>
-              ))}
-            </Select>
-          </FormGroup>
+            <FormGroup>
+              <Label>Phone Number</Label>
+              <Input name="phonenumber" value={form.phonenumber} onChange={handleChange} placeholder="Enter Phone Number" />
+            </FormGroup>
+          </FormGrid>
 
-          <FormGroup>
-            <Label>Phone Number</Label>
-            <Input name="phonenumber" value={form.phonenumber} onChange={handleChange} placeholder="Enter Phone Number" />
-          </FormGroup>
-        </FormGrid>
+          {/* Procedure Selection */}
+          <SectionTitle>Procedure Selection</SectionTitle>
+          <FormGrid style={{ gridTemplateColumns: '1fr' }}>
+            <FormGroup>
+              <Label>Select Procedure</Label>
+              <Select onChange={handleProcedureSelect}>
+                <option value="">-- Select a Procedure --</option>
+                {procedures.map((item, i) => (
+                  <option key={i} value={item.procedure_name}>
+                    {item.procedure_name} - ₹{item.rate}
+                  </option>
+                ))}
+              </Select>
+            </FormGroup>
+          </FormGrid>
 
-        {/* Procedure Selection */}
-        <SectionTitle>Procedure Selection</SectionTitle>
-        <FormGrid style={{ gridTemplateColumns: '1fr' }}>
-          <FormGroup>
-            <Label>Select Procedure</Label>
-            <Select onChange={handleProcedureSelect}>
-              <option value="">-- Select a Procedure --</option>
-              {procedures.map((item, i) => (
-                <option key={i} value={item.procedure_name}>
-                  {item.procedure_name} - ₹{item.rate}
-                </option>
-              ))}
-            </Select>
-          </FormGroup>
-        </FormGrid>
+          {/* Selected Procedures Table */}
+          {selectedProcedures.length > 0 && (
+            <Table>
+              <thead>
+                <tr>
+                  <Th>Procedure Name</Th>
+                  <Th>Unit</Th>
+                  <Th>Rate (₹)</Th>       
+                  <Th>Total (₹)</Th>
+                  <Th>Action</Th>
+                </tr>
+              </thead>
 
-        {/* Selected Procedures Table */}
-        {selectedProcedures.length > 0 && (
-          <Table>
-            <thead>
-              <tr>
-                <Th>Procedure Name</Th>
-                <Th>Unit</Th>
-                <Th>Rate (₹)</Th>       
-                <Th>Total (₹)</Th>
-                <Th>Action</Th>
-              </tr>
-            </thead>
+              <tbody>
+                {selectedProcedures.map((item, idx) => (
+                  <tr key={idx}>
+                    {/* Procedure Name */}
+                    <Td>{item.procedure_name}</Td>
 
-          <tbody>
-  {selectedProcedures.map((item, idx) => (
-    <tr key={idx}>
-      {/* Procedure Name */}
-      <Td>{item.procedure_name}</Td>
+                    {/* UNIT Input (Correct position) */}
+                    <Td>
+                      <Input
+                        type="text"
+                        value={item.unit}
+                        onChange={(e) => {
+                          const unit = Number(e.target.value);
+                          setSelectedProcedures((prev) =>
+                            prev.map((p, i) =>
+                              i === idx
+                                ? { ...p, unit, total: unit * Number(p.rate) }
+                                : p
+                            )
+                          );
+                        }}
+                        style={{ width: "60px" }}
+                      />
+                    </Td>
 
-      {/* UNIT Input (Correct position) */}
-      <Td>
-        <Input
-          type="text"
-         
-          value={item.unit}
-          onChange={(e) => {
-            const unit = Number(e.target.value);
-            setSelectedProcedures((prev) =>
-              prev.map((p, i) =>
-                i === idx
-                  ? { ...p, unit, total: unit * Number(p.rate) }
-                  : p
-              )
-            );
-          }}
-          style={{ width: "60px" }}
-        />
-      </Td>
+                    {/* Rate (Correct position) */}
+                    <Td>₹ {Number(item.rate).toFixed(2)}</Td>
 
-      {/* Rate (Correct position) */}
-      <Td>₹ {Number(item.rate).toFixed(2)}</Td>
+                    {/* Total */}
+                    <Td>₹ {Number(item.total).toFixed(2)}</Td>
 
-      {/* Total */}
-      <Td>₹ {Number(item.total).toFixed(2)}</Td>
+                    {/* Remove */}
+                    <Td>
+                      <DangerButton onClick={() => removeItem(item.procedure_name)}>
+                        Remove
+                      </DangerButton>
+                    </Td>
+                  </tr>
+                ))}
 
-      {/* Remove */}
-      <Td>
-        <DangerButton onClick={() => removeItem(item.procedure_name)}>
-          Remove
-        </DangerButton>
-      </Td>
-    </tr>
-  ))}
+                {/* Total */}
+                <TotalRow>
+                  <Td colSpan="3">Total Amount</Td>
+                  <Td colSpan="2">₹ {totalAmount.toFixed(2)}</Td>
+                </TotalRow>
+              </tbody>
+            </Table>
+          )}
 
-  {/* Total */}
-  <TotalRow>
-    <Td colSpan="3">Total Amount</Td>
-    <Td colSpan="2">₹ {totalAmount.toFixed(2)}</Td>
-  </TotalRow>
-</tbody>
+          {/* Discount Section */}
+          {selectedProcedures.length > 0 && (
+            <>
+              <SectionTitle>Discount & Final Amount</SectionTitle>
+              <DiscountGrid>
+                <FormGroup>
+                  <Label>Discount Type</Label>
+                  <Select value={discountType} onChange={(e) => setDiscountType(e.target.value)}>
+                    <option value="percentage">Percentage (%)</option>
+                    <option value="amount">Amount (₹)</option>
+                  </Select>
+                </FormGroup>
 
+                <FormGroup>
+                  <Label>Discount Value</Label>
+                  <Input
+                    type="number"
+                    value={discountValue}
+                    onChange={(e) => setDiscountValue(e.target.value)}
+                    placeholder="Enter discount"
+                  />
+                </FormGroup>
 
-          </Table>
-        )}
+                <AmountDisplay>
+                  <Label>Discount Amount</Label>
+                  <div className="amount">₹ {discountAmount.toFixed(2)}</div>
+                </AmountDisplay>
 
-        {/* Discount Section */}
-        {selectedProcedures.length > 0 && (
-          <>
-            <SectionTitle>Discount & Final Amount</SectionTitle>
-            <DiscountGrid>
-              <FormGroup>
-                <Label>Discount Type</Label>
-                <Select value={discountType} onChange={(e) => setDiscountType(e.target.value)}>
-                  <option value="percentage">Percentage (%)</option>
-                  <option value="amount">Amount (₹)</option>
-                </Select>
-              </FormGroup>
+                <AmountDisplay>
+                  <Label>Final Amount</Label>
+                  <div className="amount">₹ {finalAmount.toFixed(2)}</div>
+                </AmountDisplay>
+              </DiscountGrid>
+            </>
+          )}
 
-              <FormGroup>
-                <Label>Discount Value</Label>
-                <Input
-                  type="number"
-                  value={discountValue}
-                  onChange={(e) => setDiscountValue(e.target.value)}
-                  placeholder="Enter discount"
-                />
-              </FormGroup>
-
-              <AmountDisplay>
-                <Label>Discount Amount</Label>
-                <div className="amount">₹ {discountAmount.toFixed(2)}</div>
-              </AmountDisplay>
-
-              <AmountDisplay>
-                <Label>Final Amount</Label>
-                <div className="amount">₹ {finalAmount.toFixed(2)}</div>
-              </AmountDisplay>
-            </DiscountGrid>
-          </>
-        )}
-
-        <SubmitButton onClick={handleSubmit}>
-          Submit & Print Bill
-        </SubmitButton>
-      </Card>
-    </PageContainer>
+          <SubmitButton onClick={handleSubmit}>
+            Submit & Print Bill
+          </SubmitButton>
+        </Card>
+      </PageContainer>
     </>
   );
 }
