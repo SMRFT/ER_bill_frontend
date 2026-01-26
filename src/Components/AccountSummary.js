@@ -29,11 +29,7 @@ import {
   StyledTd,
   StatusBadge,
   AmountCell,
-  DiscountedAmount,
   EmptyState,
-  EmptyIcon,
-  EmptyText,
-  EmptySubtext,
   LoadingOverlay,
   Spinner,
   PatientInfo,
@@ -42,17 +38,137 @@ import {
 } from "../Styles/globalStyles";
 
 import apiRequest from "./apiRequest";
-
 const ERbaseurl = process.env.REACT_APP_BACKEND_ER_BASE_URL;
+
+// Modern Download Button Component
+const DownloadButton = ({ type, onClick }) => {
+  const styles = {
+    excel: {
+      bg: 'linear-gradient(135deg, #558068ff 0%, #23864F 100%)',
+      hoverBg: 'linear-gradient(135deg, #155633 0%, #1D6F42 100%)',
+      icon: '📊'
+    },
+    pdf: {
+      bg: 'linear-gradient(135deg, #DC2626 0%, #EF4444 100%)',
+      hoverBg: 'linear-gradient(135deg, #B91C1C 0%, #DC2626 100%)',
+      icon: '📄'
+    }
+  };
+
+  const style = styles[type];
+
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        background: style.bg,
+        border: 'none',
+        borderRadius: '8px',
+        padding: '8px 16px',
+        color: 'white',
+        fontSize: '13px',
+        fontWeight: '600',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        transition: 'all 0.3s ease',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+      }}
+      onMouseEnter={(e) => {
+        e.target.style.background = style.hoverBg;
+        e.target.style.transform = 'translateY(-2px)';
+        e.target.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.2)';
+      }}
+      onMouseLeave={(e) => {
+        e.target.style.background = style.bg;
+        e.target.style.transform = 'translateY(0)';
+        e.target.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.15)';
+      }}
+    >
+      <span style={{ fontSize: '16px' }}>{style.icon}</span>
+      {type.toUpperCase()}
+    </button>
+  );
+};
+
+// Modern Stat Card Component
+const ModernStatCard = ({ title, amount, onExcel, onPdf, color }) => {
+  const gradients = {
+    cash: 'white',
+    card: 'white',
+    upi: 'white',
+    total: 'white',
+  };
+
+  return (
+    <div
+      style={{
+        background: 'linear-gradient(135deg, #d6a3c3ff 0%, #e773bbff 100%)',
+        borderRadius: '16px',
+        padding: '24px',
+        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.07)',
+        border: '1px solid #E5E7EB',
+        transition: 'all 0.3s ease',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = 'translateY(-4px)';
+        e.currentTarget.style.boxShadow = '0 12px 24px rgba(0, 0, 0, 0.12)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = 'translateY(0)';
+        e.currentTarget.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.07)';
+      }}
+    >
+      <div style={{ marginBottom: '16px' }}>
+        <div
+          style={{
+            fontSize: '15px',
+            fontWeight: '1600',
+            color: '#432323',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+            marginBottom: '8px',
+          }}
+        >
+          {title}
+        </div>
+        <div
+          style={{
+            fontSize: '32px',
+            fontWeight: '700',
+            background: gradients[color],
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}
+        >
+          {amount}
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <DownloadButton type="excel" onClick={onExcel} />
+        <DownloadButton type="pdf" onClick={onPdf} />
+      </div>
+    </div>
+  );
+};
 
 export default function AccountSummary() {
   const [summaryData, setSummaryData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState(null);
 
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+  // Get current date in YYYY-MM-DD format
+  const getCurrentDate = () => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  };
+
+  const [fromDate, setFromDate] = useState(getCurrentDate());
+  const [toDate, setToDate] = useState(getCurrentDate());
   const [paymentMode, setPaymentMode] = useState("all");
+
+  /* ---------------- FETCH DATA ---------------- */
 
   useEffect(() => {
     fetchSummary();
@@ -60,14 +176,11 @@ export default function AccountSummary() {
 
   const fetchSummary = async () => {
     setLoading(true);
-
     try {
       let query = "?";
-
       if (fromDate && toDate) {
         query += `from_date=${fromDate}&to_date=${toDate}&`;
       }
-
       if (paymentMode !== "all") {
         query += `payment_mode=${paymentMode}`;
       }
@@ -77,295 +190,239 @@ export default function AccountSummary() {
       if (result.success) {
         const processed = result.data.map((item) => ({
           ...item,
-          procedures:
-            typeof item.procedures === "string"
-              ? JSON.parse(item.procedures)
-              : item.procedures,
           payment_mode:
-            typeof item.payment_mode === "string" && item.payment_mode
+            typeof item.payment_mode === "string"
               ? JSON.parse(item.payment_mode)
               : item.payment_mode,
         }));
-
         setSummaryData(processed);
-      } else {
-        showToast("Failed to fetch account summary", "error");
       }
-    } catch (err) {
-      showToast("API Error", "error");
     } finally {
       setLoading(false);
     }
   };
 
-  const showToast = (message, type = "success") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  };
+  /* ---------------- HELPERS ---------------- */
 
-  const clearFilters = () => {
-    setFromDate("");
-    setToDate("");
-    setPaymentMode("all");
-  };
-
-  const calculateStats = () => {
-    const totalRecords = summaryData.length;
-    const totalAmount = summaryData.reduce((sum, item) => sum + (item.total || 0), 0);
-    const totalDiscounted = summaryData.reduce(
-      (sum, item) => sum + (item.net_amount || 0),
-      0
-    );
-
-    return { totalRecords, totalAmount, totalDiscounted };
-  };
-
-  const stats = calculateStats();
-
-  const formatCurrency = (amount) =>
+  const formatCurrency = (amt) =>
     new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency: "INR",
       maximumFractionDigits: 0,
-    }).format(amount);
+    }).format(amt || 0);
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return "-";
-    return new Date(dateStr).toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
+  const formatDate = (d) =>
+    d
+      ? new Date(d).toLocaleDateString("en-IN", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+      : "-";
+
+  /* ---------------- MODE-WISE SPLITTER (CRITICAL) ---------------- */
+
+  const getModeWiseData = (mode) => {
+    return summaryData
+      .map((item) => {
+        const pm = item.payment_mode?.find((p) => p.method === mode);
+        if (!pm) return null;
+
+        return {
+          patientname: item.patientname,
+          uhid: item.uhid,
+          doctorname: item.doctorname,
+          date: item.date,
+          amount: Number(pm.amount),
+          billing_status: item.billing_status,
+        };
+      })
+      .filter(Boolean);
+  };
+
+  /* ---------------- MODE TOTALS ---------------- */
+
+  const calculatePaymentTotals = () => {
+    const totals = { cash: 0, card: 0, upi: 0 };
+
+    summaryData.forEach((item) => {
+      item.payment_mode?.forEach((pm) => {
+        if (totals.hasOwnProperty(pm.method)) {
+          totals[pm.method] += Number(pm.amount);
+        }
+      });
     });
+
+    return totals;
   };
 
-  // Format payment methods for display
-  const formatPaymentMethods = (paymentMode) => {
-    if (!paymentMode || (Array.isArray(paymentMode) && paymentMode.length === 0)) {
-      return "Not Paid";
-    }
+  const paymentTotals = calculatePaymentTotals();
+  const grandTotal = paymentTotals.cash + paymentTotals.card + paymentTotals.upi;
 
-    if (Array.isArray(paymentMode)) {
-      return paymentMode
-        .map((pm) => `${pm.method.toUpperCase()}: ${formatCurrency(pm.amount)}`)
-        .join(", ");
-    }
+  /* ---------------- EXCEL DOWNLOAD ---------------- */
 
-    return "Not Paid";
-  };
-
-  // Format payment methods for Excel (plain text)
-  const formatPaymentMethodsExcel = (paymentMode) => {
-    if (!paymentMode || (Array.isArray(paymentMode) && paymentMode.length === 0)) {
-      return "Not Paid";
-    }
-
-    if (Array.isArray(paymentMode)) {
-      return paymentMode
-        .map((pm) => `${pm.method.toUpperCase()}: ₹${pm.amount}`)
-        .join(", ");
-    }
-
-    return "Not Paid";
-  };
-
-  // ⭐⭐⭐ EXCEL DOWNLOAD
-  const downloadExcel = () => {
+  const downloadExcelByMode = (mode) => {
     import("xlsx").then((xlsx) => {
-      const sheetData = summaryData.map((item) => ({
-        PatientName: item.patientname,
-        UHID: item.uhid,
-        Doctor: item.doctorname,
-        Date: formatDate(item.date),
-        Total: item.total,
-        Discount: item.discount_amount,
-        NetAmount: item.net_amount,
-        PaymentMethod: formatPaymentMethodsExcel(item.payment_mode),
-        Status: item.billing_status,
+      const data = getModeWiseData(mode).map((row) => ({
+        Patient: row.patientname,
+        UHID: row.uhid,
+        Doctor: row.doctorname,
+        Date: formatDate(row.date),
+        Amount: row.amount,
+        Mode: mode.toUpperCase(),
+        Status: row.billing_status,
       }));
 
-      const worksheet = xlsx.utils.json_to_sheet(sheetData);
-      const workbook = xlsx.utils.book_new();
-      xlsx.utils.book_append_sheet(workbook, worksheet, "AccountSummary");
-
-      xlsx.writeFile(workbook, "AccountSummary.xlsx");
+      const sheet = xlsx.utils.json_to_sheet(data);
+      const wb = xlsx.utils.book_new();
+      xlsx.utils.book_append_sheet(wb, sheet, mode.toUpperCase());
+      xlsx.writeFile(wb, `${mode.toUpperCase()}_Collection.xlsx`);
     });
   };
 
-  // ⭐⭐⭐ PDF DOWNLOAD
-  const downloadPDF = async () => {
+  const downloadExcelTotal = () => {
+    import("xlsx").then((xlsx) => {
+      const data = summaryData.map((row) => ({
+        Patient: row.patientname,
+        UHID: row.uhid,
+        Doctor: row.doctorname,
+        Date: formatDate(row.date),
+        'Payment Modes': row.payment_mode.map(pm => `${pm.method.toUpperCase()}: ${pm.amount}`).join(', '),
+        'Total Amount': row.payment_mode.reduce((sum, pm) => sum + Number(pm.amount), 0),
+        Status: row.billing_status,
+      }));
+
+      const sheet = xlsx.utils.json_to_sheet(data);
+      const wb = xlsx.utils.book_new();
+      xlsx.utils.book_append_sheet(wb, sheet, "Total Collection");
+      xlsx.writeFile(wb, `Total_Collection.xlsx`);
+    });
+  };
+
+  /* ---------------- PDF DOWNLOAD ---------------- */
+
+  const downloadPDFByMode = async (mode) => {
     const jsPDFModule = await import("jspdf");
     const autoTable = await import("jspdf-autotable");
 
     const doc = new jsPDFModule.jsPDF();
-
-    doc.text("Account Summary", 14, 15);
-
-    const tableColumn = [
-      "Patient Name",
-      "UHID",
-      "Doctor",
-      "Date",
-      "Total",
-      "Discount",
-      "Net Amount",
-      "Payment Method",
-      "Status",
-    ];
-
-    const tableRows = summaryData.map((item) => [
-      item.patientname,
-      item.uhid,
-      item.doctorname,
-      formatDate(item.date),
-      item.total,
-      item.discount_amount,
-      item.net_amount,
-      formatPaymentMethodsExcel(item.payment_mode),
-      item.billing_status,
-    ]);
+    doc.text(`${mode.toUpperCase()} Collection Report`, 14, 15);
 
     autoTable.default(doc, {
-      head: [tableColumn],
-      body: tableRows,
       startY: 25,
+      head: [["Patient", "UHID", "Doctor", "Date", "Amount"]],
+      body: getModeWiseData(mode).map((row) => [
+        row.patientname,
+        row.uhid,
+        row.doctorname,
+        formatDate(row.date),
+        row.amount,
+      ]),
       styles: { fontSize: 8 },
-      headStyles: { fillColor: [22, 160, 133] },
     });
 
-    doc.save("AccountSummary.pdf");
+    doc.save(`${mode.toUpperCase()}_Collection.pdf`);
   };
+
+  const downloadPDFTotal = async () => {
+    const jsPDFModule = await import("jspdf");
+    const autoTable = await import("jspdf-autotable");
+
+    const doc = new jsPDFModule.jsPDF();
+    doc.text("Total Collection Report", 14, 15);
+
+    autoTable.default(doc, {
+      startY: 25,
+      head: [["Patient", "UHID", "Doctor", "Date", "Payment Modes", "Total"]],
+      body: summaryData.map((row) => [
+        row.patientname,
+        row.uhid,
+        row.doctorname,
+        formatDate(row.date),
+        row.payment_mode.map(pm => `${pm.method}: ${pm.amount}`).join('\n'),
+        row.payment_mode.reduce((sum, pm) => sum + Number(pm.amount), 0),
+      ]),
+      styles: { fontSize: 7 },
+    });
+
+    doc.save("Total_Collection.pdf");
+  };
+
+  /* ---------------- UI ---------------- */
 
   return (
     <PageContainer>
-      {toast && (
-        <ToastContainer>
-          <Toast type={toast.type}>
-            <ToastIcon>{toast.type === "success" ? "✓" : "✕"}</ToastIcon>
-            <ToastMessage>{toast.message}</ToastMessage>
-            <ToastClose onClick={() => setToast(null)}>×</ToastClose>
-          </Toast>
-        </ToastContainer>
-      )}
-
-      {/* ---------------- Header + Download Buttons ---------------- */}
       <HeaderSection>
         <div>
           <PageTitle>Account Summary</PageTitle>
-          <Subtitle>View billed records</Subtitle>
-        </div>
-
-        <div style={{ display: "flex", gap: "10px" }}>
-          <button
-            onClick={downloadExcel}
-            style={{
-              padding: "10px 18px",
-              background: "#059669",
-              color: "#fff",
-              borderRadius: "8px",
-              border: "none",
-              cursor: "pointer",
-              height: "44px",
-            }}
-          >
-            Download Excel
-          </button>
-
-          <button
-            onClick={downloadPDF}
-            style={{
-              padding: "10px 18px",
-              background: "#dc2626",
-              color: "#fff",
-              borderRadius: "8px",
-              border: "none",
-              cursor: "pointer",
-              height: "44px",
-            }}
-          >
-            Download PDF
-          </button>
+          <Subtitle>Mode-wise accurate billing report</Subtitle>
         </div>
       </HeaderSection>
 
-      {/* ---------------- Filters ---------------- */}
+      {/* FILTERS */}
       <FilterCard>
         <FilterGrid>
           <FormGroup>
-            <Label>From Date</Label>
-            <StyledInput
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-            />
+            <Label>From</Label>
+            <StyledInput type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
           </FormGroup>
 
           <FormGroup>
-            <Label>To Date</Label>
-            <StyledInput
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-            />
+            <Label>To</Label>
+            <StyledInput type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
           </FormGroup>
 
-          <FormGroup>
-            <Label>Payment Mode</Label>
-            <select
-              style={{
-                padding: "8px",
-                borderRadius: "6px",
-                border: "1px solid #ccc",
-              }}
-              value={paymentMode}
-              onChange={(e) => setPaymentMode(e.target.value)}
-            >
-              <option value="all">All</option>
-              <option value="cash">Cash</option>
-              <option value="card">Card</option>
-              <option value="upi">UPI</option>
-            </select>
-          </FormGroup>
-
-          <ClearButton onClick={clearFilters}>Clear Filters</ClearButton>
+          <ClearButton onClick={() => { setFromDate(""); setToDate(""); setPaymentMode("all"); }}>
+            Clear
+          </ClearButton>
         </FilterGrid>
       </FilterCard>
 
-      {/* ---------------- Stats ---------------- */}
+      {/* PAYMENT CARDS */}
       <StatsRow>
-        <StatCard gradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)">
-          <StatValue>{stats.totalRecords}</StatValue>
-          <StatLabel>Total Records</StatLabel>
-        </StatCard>
+        <ModernStatCard
+          title="Cash"
+          amount={formatCurrency(paymentTotals.cash)}
+          onExcel={() => downloadExcelByMode("cash")}
+          onPdf={() => downloadPDFByMode("cash")}
+          color="cash"
+        />
+        
+        <ModernStatCard
+          title="Card"
+          amount={formatCurrency(paymentTotals.card)}
+          onExcel={() => downloadExcelByMode("card")}
+          onPdf={() => downloadPDFByMode("card")}
+          color="card"
+        />
+        
+        <ModernStatCard
+          title="UPI"
+          amount={formatCurrency(paymentTotals.upi)}
+          onExcel={() => downloadExcelByMode("upi")}
+          onPdf={() => downloadPDFByMode("upi")}
+          color="upi"
+        />
 
-        <StatCard gradient="linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)">
-          <StatValue>{formatCurrency(stats.totalAmount)}</StatValue>
-          <StatLabel>Total Amount</StatLabel>
-        </StatCard>
-
-        <StatCard gradient="linear-gradient(135deg, #10b981 0%, #059669 100%)">
-          <StatValue>{formatCurrency(stats.totalDiscounted)}</StatValue>
-          <StatLabel>Net Total</StatLabel>
-        </StatCard>
+        <ModernStatCard
+          title="Total Amount"
+          amount={formatCurrency(grandTotal)}
+          onExcel={downloadExcelTotal}
+          onPdf={downloadPDFTotal}
+          color="total"
+        />
       </StatsRow>
 
-      {/* ---------------- Table ---------------- */}
+      {/* TABLE */}
       <TableCard>
         <TableHeader>
           <TableTitle>Billing Records</TableTitle>
-          <RecordCount>{stats.totalRecords} records</RecordCount>
+          <RecordCount>{summaryData.length}</RecordCount>
         </TableHeader>
 
         <TableWrapper>
           {loading ? (
-            <LoadingOverlay>
-              <Spinner />
-            </LoadingOverlay>
-          ) : summaryData.length === 0 ? (
-            <EmptyState>
-              <EmptyIcon>📋</EmptyIcon>
-              <EmptyText>No records found</EmptyText>
-              <EmptySubtext>Try adjusting filters</EmptySubtext>
-            </EmptyState>
+            <LoadingOverlay><Spinner /></LoadingOverlay>
           ) : (
             <StyledTable>
               <thead>
@@ -373,52 +430,28 @@ export default function AccountSummary() {
                   <StyledTh>Patient</StyledTh>
                   <StyledTh>Doctor</StyledTh>
                   <StyledTh>Date</StyledTh>
-                  <StyledTh>Total</StyledTh>
-                  <StyledTh>Discount</StyledTh>
-                  <StyledTh>Net Amount</StyledTh>
-                  <StyledTh>Payment Method</StyledTh>
+                  <StyledTh>Payment</StyledTh>
                   <StyledTh>Status</StyledTh>
                 </tr>
               </thead>
               <tbody>
-                {summaryData.map((item, idx) => (
-                  <tr key={idx}>
+                {summaryData.map((item, i) => (
+                  <tr key={i}>
                     <StyledTd>
                       <PatientInfo>
                         <PatientName>{item.patientname}</PatientName>
                         <UhidTag>{item.uhid}</UhidTag>
                       </PatientInfo>
                     </StyledTd>
-
                     <StyledTd>{item.doctorname}</StyledTd>
                     <StyledTd>{formatDate(item.date)}</StyledTd>
-
                     <StyledTd>
-                      <AmountCell>{formatCurrency(item.total)}</AmountCell>
+                      {item.payment_mode.map((pm, idx) => (
+                        <div key={idx}>
+                          {pm.method.toUpperCase()} : {formatCurrency(pm.amount)}
+                        </div>
+                      ))}
                     </StyledTd>
-
-                    <StyledTd>
-                      <DiscountedAmount>
-                        {formatCurrency(item.discount_amount)}
-                      </DiscountedAmount>
-                    </StyledTd>
-
-                    <StyledTd>
-                      <DiscountedAmount>
-                        {formatCurrency(item.net_amount)}
-                      </DiscountedAmount>
-                    </StyledTd>
-
-                    <StyledTd>
-                      <div style={{ 
-                        fontSize: "13px", 
-                        color: "#374151",
-                        lineHeight: "1.5"
-                      }}>
-                        {formatPaymentMethods(item.payment_mode)}
-                      </div>
-                    </StyledTd>
-
                     <StyledTd>
                       <StatusBadge status={item.billing_status}>
                         {item.billing_status}

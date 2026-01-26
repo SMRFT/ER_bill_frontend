@@ -5,6 +5,7 @@ import Sidebar from './Components/Sidebar';
 import Pharmacy from './Components/pharmacy';
 import AccountSummary from './Components/AccountSummary';
 import PrintBill from './Components/PrintBill';
+import ERReport from './Components/ERReport';
 
 
 
@@ -38,6 +39,7 @@ function App() {
             <Route path="/Pharmacy" element={<Pharmacy />} />
             <Route path="/AccountSummary" element={<AccountSummary />} />
             <Route path="/PrintBill" element={<PrintBill />} />
+            <Route path="/ERReport" element={<ERReport />} />
 
           </Routes>
         </Sidebar>

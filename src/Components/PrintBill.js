@@ -169,42 +169,50 @@ const fetchBilledPatients = async () => {
     console.error("Error fetching billing data:", err);
   }
 };
+const formatDateTime = (value) => {
+  if (!value) return "";
+
+  const dt = new Date(value);
+
+  return dt.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+};
 
 
-  const printBill = (data) => {
-
-    const formatDateTimeUTC = (isoString) => {
-      if (!isoString) return "NIL"
-      const dateObj = new Date(isoString)
-      const formatted = dateObj.toLocaleString("en-IN", {
-        year: "numeric",
-        month: "numeric",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        timeZone: "Asia/Kolkata",
-        hour12: true,
-      });
-      return formatted.replace(/am|pm/gi, (match) => match.toUpperCase());
-    }
-
+   const printBill = (data) => {
     const printWindow = window.open("", "_blank");
     if (!printWindow) {
       alert("Popup blocked! Allow popups to print.");
       return;
     }
 
-    const procedureRows = data.procedures
-      .map(
-        (item, index) => `
-        <div style="display: flex; justify-content: space-between; font-size: 14px; margin: 2px 0;">
-          <div style="width: 10%; text-align: center;">${index + 1}</div>
-          <div style="width: 60%; padding-left: 5px;">${item.procedure_name}</div>
-          <div style="width: 30%; text-align: right;">₹${Number(item.rate).toFixed(2)}</div>
-        </div>`
-      )
-      .join("");
+   // ✅ FIX 1: Parse procedures correctly
+  const procedures = Array.isArray(data.procedures)
+    ? data.procedures
+    : JSON.parse(data.procedures || "[]");
+
+  // ✅ FIX 2: Format date BEFORE passing to print window
+  const billDateTime = formatDateTime(data.date);
+
+  const procedureRows = procedures
+    .map(
+      (item, index) => `
+      <div class="procedure-row">
+        <div class="col-sl">${index + 1}</div>
+        <div class="col-desc">${item.procedure_name}</div>
+        <div class="col-qty">${item.unit}</div>
+        <div class="col-rate">₹${Number(item.rate).toFixed(2)}</div>
+        <div class="col-amt">₹${Number(item.total).toFixed(2)}</div>
+      </div>`
+    )
+    .join("");
 
     printWindow.document.write(`
       <html>
@@ -212,80 +220,110 @@ const fetchBilledPatients = async () => {
           <title>ER Bill - ${data.billnumber}</title>
           <style>
             body {
-              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              font-family: Arial, sans-serif;
               font-size: 14px;
               padding: 10px;
               width: 80mm;
-              color: #000;
             }
             .center { text-align: center; }
             .line { border-top: 1px solid #000; margin: 8px 0; }
-            .header-title { font-weight: bold; font-size: 16px; margin-bottom: 4px; }
-            
+            .header-title { font-weight: bold; font-size: 16px; }
+
             .info-table {
               display: grid;
-              grid-template-columns: 35% 5% 60%;
+              grid-template-columns: 40% 5% 55%;
               margin-top: 5px;
+              font-size: 14px;
+            }
+            .info-label { font-weight: bold; text-align: left; }
+            .info-colon { text-align: center; }
+            .info-value {
+                text-align: left;
+              }
+
+
+            .procedure-header,
+            .procedure-row {
+              display: flex;
               font-size: 13px;
             }
-            .info-label { font-weight: 600; text-align: left; }
-            .info-colon { text-align: center; }
-            .info-value { text-align: right; word-break: break-word; }
+
+            .col-sl {
+              width: 8%;
+              text-align: center;
+            }
+
+            .col-desc {
+              width: 42%;
+              padding-left: 4px;
+            }
+
+            .col-qty {
+              width: 10%;
+              text-align: center;
+            }
+
+            .col-rate {
+              width: 20%;
+              text-align: right;
+            }
+
+            .col-amt {
+              width: 20%;
+              text-align: right;
+            }
 
             .procedure-header {
-              display: flex;
               font-weight: bold;
               border-bottom: 1px solid #000;
               padding-bottom: 4px;
               margin-bottom: 4px;
-              font-size: 13px;
             }
-            .procedure-header div:nth-child(1) { width: 10%; text-align: center; }
-            .procedure-header div:nth-child(2) { width: 60%; }
-            .procedure-header div:nth-child(3) { width: 30%; text-align: right; }
+
 
             .totals {
               font-weight: bold;
               display: flex;
               justify-content: flex-end;
               margin-top: 6px;
-              font-size: 14px;
             }
-            .totals div { width: 40%; text-align: right; }
+            .totals div { width: 30%; text-align: right; }
           </style>
         </head>
 
         <body>
           <div class="center">
             <div class="header-title">SHANMUGA HOSPITAL LIMITED</div>
-            <div style="font-size: 12px;">51/24, Saradha College Road, Salem - 636007</div>
-            <div style="font-size: 12px;">CIN: L85110TZ2020PLC033974</div>
+            <div>51/24, Saradha College Road, Salem - 636007</div>
+            <div>CIN: L85110TZ2020PLC033974</div>
+            <div>GST: 33ABDCS8326A1ZP</div>
           </div>
 
           <div class="line"></div>
 
-          <div class="center" style="font-weight: bold; font-size: 15px;">ER CASH BILL</div>
+          <div class="center" style="font-weight: bold;">Cash Bill - <u>ER BILL (SH)</u></div>
 
           <div class="line"></div>
 
           <div class="info-table">
-            <div class="info-label">Bill No</div><div class="info-colon">:</div><div class="info-value">${data.billnumber}</div>
-            <div class="info-label">UHID</div><div class="info-colon">:</div><div class="info-value">${data.uhid}</div>
-           <div class="info-label">Date</div>
-              <div class="info-colon">:</div>
-              <div class="info-value">${formatDateTimeUTC(data.date) || "NIL"}</div>
-
-            <div class="info-label">Patient</div><div class="info-colon">:</div><div class="info-value">${data.patientname}</div>
+            <div class="info-label">Bill Number</div><div class="info-colon">:</div><div class="info-value">${data.billnumber}</div>
+            <div class="info-label">OP Number</div><div class="info-colon">:</div><div class="info-value">${data.uhid}</div>
+            <div class="info-label">Bill Date</div><div class="info-colon">:</div><div class="info-value">${billDateTime}</div>
+            <div class="info-label">Name</div><div class="info-colon">:</div><div class="info-value">${data.patientname}</div>
+            <div class="info-label">Age</div><div class="info-colon">:</div><div class="info-value">${data.age}</div>
             <div class="info-label">Doctor</div><div class="info-colon">:</div><div class="info-value">${data.doctorname}</div>
           </div>
 
           <div class="line"></div>
 
-          <div class="procedure-header">
-            <div>#</div>
-            <div>Description</div>
-            <div>Amt (₹)</div>
+              <div class="procedure-header">
+            <div class="col-sl">Sl</div>
+            <div class="col-desc">Description</div>
+            <div class="col-qty">Qty</div>
+            <div class="col-rate">Rate</div>
+            <div class="col-amt">Amount</div>
           </div>
+
 
           ${procedureRows}
 
@@ -305,10 +343,7 @@ const fetchBilledPatients = async () => {
 
           <div class="line"></div>
 
-          <div style="margin-top: 40px; display: flex; justify-content: space-between; font-size: 12px;">
-            <div>Cashier</div>
-            <div>Authorized Signatory</div>
-          </div>
+          <div style="margin-top: 30px;">Signature: ___________________</div>
 
           <script>
             window.onload = function() {
