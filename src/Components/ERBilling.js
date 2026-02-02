@@ -35,7 +35,6 @@ export default function ERBilling() {
   const [form, setForm] = useState({
     uhid: "",
     patientname: "",
-    dateofbirth: "",
     age: "",
     gender: "",
     phonenumber: "",
@@ -133,35 +132,6 @@ export default function ERBilling() {
   /* ---------------- Form Handler ---------------- */
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
-  };
-
-  /* ---------------- Calculate Age from Date of Birth ---------------- */
-  const calculateAge = (dob) => {
-    if (!dob) return "";
-    
-    const birthDate = new Date(dob);
-    const today = new Date();
-    
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    
-    // Adjust age if birthday hasn't occurred this year
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    
-    return age;
-  };
-
-  const handleDOBChange = (e) => {
-    const dob = e.target.value;
-    const calculatedAge = calculateAge(dob);
-    
-    setForm({
-      ...form,
-      dateofbirth: dob,
-      age: calculatedAge
-    });
   };
 
   /* ---------------- Add Procedure ---------------- */
@@ -406,7 +376,6 @@ export default function ERBilling() {
         setForm({
           uhid: "",
           patientname: "",
-          dateofbirth: "",
           age: "",
           gender: "",
           phonenumber: "",
@@ -483,16 +452,7 @@ export default function ERBilling() {
               <Input name="patientname" value={form.patientname} onChange={handleChange} placeholder="Enter Patient Name" />
             </FormGroup>
 
-            <FormGroup>
-              <Label>Date of Birth</Label>
-              <Input 
-                type="date" 
-                name="dateofbirth" 
-                value={form.dateofbirth} 
-                onChange={handleDOBChange} 
-                max={today}
-              />
-            </FormGroup>
+           
 
             <FormGroup>
               <Label>Age</Label>
@@ -500,9 +460,8 @@ export default function ERBilling() {
                 type="number" 
                 name="age" 
                 value={form.age} 
-                readOnly 
-                placeholder="Auto-calculated" 
-                style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
+                onChange={handleChange} 
+                placeholder="Enter Age" 
               />
             </FormGroup>
 

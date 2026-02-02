@@ -27,8 +27,6 @@ import apiRequest from "./apiRequest";
 
 const ERbaseurl = process.env.REACT_APP_BACKEND_ER_BASE_URL;
 
-// Re-use existing styled components from your file (table/modal styles omitted for brevity)
-// --- (Assume the styled components in your original file are present above) ---
 
 export default function Pharmacy() {
   const [billingData, setBillingData] = useState([]);
@@ -40,6 +38,12 @@ export default function Pharmacy() {
   const [toasts, setToasts] = useState([]);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedBill, setSelectedBill] = useState(null);
+
+  // Shift state
+  const [isActiveShift, setIsActiveShift] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [currentShiftNo, setCurrentShiftNo] = useState(null);
+  const [currentShiftOwner, setCurrentShiftOwner] = useState(null);
 
   // Payment UI state
   const [paymentModeType, setPaymentModeType] = useState("cash");
@@ -59,34 +63,105 @@ export default function Pharmacy() {
   };
   const removeToast = id => setToasts(prev => prev.filter(t => t.id !== id));
 
+  const loggedInUserId = localStorage.getItem("auth-user-id");
+
   useEffect(() => {
     fetchBilling(date);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date]);
 
-const fetchBilling = async selectedDate => {
-  try {
-    const result = await apiRequest(
-      `${ERbaseurl}Pharmacy/?date=${selectedDate}`,  // <-- send as query param
-      "GET"
-    );
+  useEffect(() => {
+    checkActiveShift();
+  }, []);
 
-    const processed = result.data.map(item => ({
-      ...item,
-      procedures:
-        typeof item.procedures === "string"
-          ? JSON.parse(item.procedures)
-          : item.procedures,
-    }));
-    setBillingData(processed);
-    showToast(`Loaded ${processed.length} records`, "success");
+const checkActiveShift = async () => {
+  setLoading(true);
+  try {
+    const res = await apiRequest(`${ERbaseurl}get_active_shift/`, "GET");
+    
+    // ✅ FIXED: Accessing res.data based on your shared JSON structure
+    if (res.success && res.data && res.data.is_active) {
+      setIsActiveShift(true);
+      setCurrentShiftNo(res.data.shiftno);
+      setCurrentShiftOwner(res.data.created_by);
+    } else {
+      setIsActiveShift(false);
+      setCurrentShiftNo(null);
+    }
   } catch (err) {
-    console.error("Error fetching billing:", err);
-    showToast("Failed to fetch billing records. Please try again.", "error");
+    console.error("Shift check failed:", err);
+    setIsActiveShift(false);
+  } finally {
+    setLoading(false);
   }
 };
 
-  // Open modal (only minimal fields in table; details shown in modal)
+  const startShift = async () => {
+    setLoading(true);
+    try {
+      const res = await apiRequest(
+        `${ERbaseurl}shiftdetails/`,
+        "POST",
+        { action: "start" }
+      );
+      if (res.success) {
+        setIsActiveShift(true);
+        setCurrentShiftNo(res.data.shiftno);
+        setCurrentShiftOwner(res.data.created_by);
+        showToast(`Shift ${res.data.shiftno} started`, "success");
+      }
+    } catch (err) {
+      showToast(err.response?.data?.error || "Error starting shift", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const endShift = async () => {
+ 
+
+    setLoading(true);
+    try {
+      const res = await apiRequest(
+        `${ERbaseurl}shiftdetails/`,
+        "POST",
+        { action: "end" }
+      );
+      if (res.success) {
+        setIsActiveShift(false);
+        setCurrentShiftNo(null);
+        setCurrentShiftOwner(null);
+        showToast(`Shift ended successfully`, "success");
+        fetchBilling(date);
+      }
+    } catch (err) {
+      showToast(err.response?.data?.error || "Error ending shift", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchBilling = async selectedDate => {
+    try {
+      const result = await apiRequest(
+        `${ERbaseurl}Pharmacy/?date=${selectedDate}`,
+        "GET"
+      );
+
+      const processed = result.data.map(item => ({
+        ...item,
+        procedures:
+          typeof item.procedures === "string"
+            ? JSON.parse(item.procedures)
+            : item.procedures,
+      }));
+      setBillingData(processed);
+    } catch (err) {
+      console.error("Error fetching billing:", err);
+      showToast("Failed to fetch billing records. Please try again.", "error");
+    }
+  };
+
+  // Payment functions (unchanged)
   const openPaymentModal = bill => {
     setSelectedBill(bill);
     setPaymentModeType("cash");
@@ -99,14 +174,12 @@ const fetchBilling = async selectedDate => {
   const closePaymentModal = () => {
     setShowPaymentModal(false);
     setSelectedBill(null);
-    // reset payment UI
     setPaymentModeType("cash");
     setSingleAmount("");
     setSingleDetails("");
     setMultiplePayments([{ method: "cash", amount: "", details: "" }]);
   };
 
-  // Multiple payment helpers
   const updateMultiPayment = (index, field, value) => {
     setMultiplePayments(prev => prev.map((p, i) => (i === index ? { ...p, [field]: value } : p)));
   };
@@ -120,87 +193,71 @@ const fetchBilling = async selectedDate => {
     return parseFloat(singleAmount || 0) || 0;
   };
 
-const markAsBilled = async () => {
-  if (!selectedBill) return;
+  const markAsBilled = async () => {
+    if (!selectedBill) return;
 
-  // Build payment_mode array
-  let payment_mode = [];
-  if (paymentModeType === "multiple") {
-    payment_mode = multiplePayments.map(p => ({ 
-      method: p.method, 
-      amount: Number(p.amount), 
-      details: p.details || "" 
-    }));
-  } else {
-    payment_mode = [{ 
-      method: paymentModeType, 
-      amount: Number(singleAmount || 0), 
-      details: singleDetails || "" 
-    }];
-  }
+    let payment_mode = [];
+    if (paymentModeType === "multiple") {
+      payment_mode = multiplePayments.map(p => ({ 
+        method: p.method, 
+        amount: Number(p.amount), 
+        details: p.details || "" 
+      }));
+    } else {
+      payment_mode = [{ 
+        method: paymentModeType, 
+        amount: Number(singleAmount || 0), 
+        details: singleDetails || "" 
+      }];
+    }
 
-  const totalPaid = payment_mode.reduce((s, p) => s + (Number(p.amount) || 0), 0);
-  const billAmount = Number(selectedBill.net_amount ?? selectedBill.total ?? 0);
+    const totalPaid = payment_mode.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+    const billAmount = Number(selectedBill.net_amount ?? selectedBill.total ?? 0);
 
-  if (Math.abs(totalPaid - billAmount) > 0.01) {
-    showToast(`Total paid (₹${totalPaid.toFixed(2)}) must equal bill amount (₹${billAmount.toFixed(2)})`, "error");
-    return;
-  }
+    if (Math.abs(totalPaid - billAmount) > 0.01) {
+      showToast(`Total paid (₹${totalPaid.toFixed(2)}) must equal bill amount (₹${billAmount.toFixed(2)})`, "error");
+      return;
+    }
 
-  const invalid = payment_mode.filter(pm => 
-    pm.method !== "cash" && (!pm.details || pm.details.toString().trim().length === 0)
-  );
-  if (invalid.length > 0) {
-    showToast("Please provide payment details for non-cash methods.", "error");
-    return;
-  }
-
-  try {
-    const encoded = encodeURIComponent(selectedBill.uhid);
-    const payload = {
-      payment_mode: payment_mode,
-      billing_status: "paid",
-      total_paid: totalPaid,
-    };
-
-    // Option 1: Using apiRequest
-    const response = await apiRequest(`${ERbaseurl}update-status/${encoded}/`, "PUT", {
-      data: payload,
-      headers: {
-        'Content-Type': 'application/json',
-      }
-    });
-
-    // OR Option 2: Direct axios call (if apiRequest doesn't work)
-    // const response = await axios.put(
-    //   `${ERbaseurl}update-status/${encoded}/`,
-    //   payload,
-    //   {
-    //     headers: {
-    //       'Content-Type': 'application/json',
-    //     }
-    //   }
-    // );
-
-    console.log("Response:", response.data); // Check response
-
-    setBillingData(prev => 
-      prev.map(it => 
-        it.uhid === selectedBill.uhid 
-          ? { ...it, billing_status: "paid", payment_mode, total_paid: totalPaid } 
-          : it
-      )
+    const invalid = payment_mode.filter(pm => 
+      pm.method !== "cash" && (!pm.details || pm.details.toString().trim().length === 0)
     );
+    if (invalid.length > 0) {
+      showToast("Please provide payment details for non-cash methods.", "error");
+      return;
+    }
 
-    showToast(`Payment saved for ${selectedBill.uhid}`, "success");
-    closePaymentModal();
-  } catch (err) {
-    console.error("Error updating status:", err);
-    console.error("Error response:", err.response?.data); // Debug error
-    showToast("Failed to process payment. Please try again.", "error");
-  }
-};
-  // Filtering / pagination
+    try {
+      const encoded = encodeURIComponent(selectedBill.billnumber);
+      const payload = {
+        payment_mode: payment_mode,
+        billing_status: "paid",
+        total_paid: totalPaid,
+      };
+
+      const response = await apiRequest(`${ERbaseurl}update-status/${encoded}/`, "PUT", {
+        data: payload,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      setBillingData(prev => 
+        prev.map(it => 
+          it.billnumber === selectedBill.billnumber 
+            ? { ...it, billing_status: "paid", payment_mode, total_paid: totalPaid } 
+            : it
+        )
+      );
+
+      showToast(`Payment saved for ${selectedBill.billnumber}`, "success");
+      closePaymentModal();
+    } catch (err) {
+      console.error("Error updating status:", err);
+      showToast("Failed to process payment. Please try again.", "error");
+    }
+  };
+
   const filteredData = useMemo(() => {
     let data = [...billingData];
     if (search.trim() !== "") {
@@ -212,15 +269,88 @@ const markAsBilled = async () => {
     return data;
   }, [billingData, search, doctorFilter, sortBy]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredData.length / perPage));
-  const startIndex = (page - 1) * perPage;
-  const paginatedData = filteredData.slice(startIndex, startIndex + perPage);
+  const totalPages = Math.ceil(filteredData.length / perPage);
+  const paginatedData = filteredData.slice((page - 1) * perPage, page * perPage);
 
-  const pendingCount = billingData.filter(b => (b.billing_status || "").toString().toLowerCase() !== "paid").length;
-  const billedCount = billingData.filter(b => (b.billing_status || "").toString().toLowerCase() === "paid").length;
+  const pendingCount = billingData.filter(b => String(b.billing_status).toLowerCase() !== "paid").length;
+  const billedCount = billingData.filter(b => String(b.billing_status).toLowerCase() === "paid").length;
 
   return (
     <PageContainer>
+      {/* ✅ PERFECT LOGIC: Show ONLY ONE button based on shift status */}
+      <div style={{ position: "absolute", top: 20, right: 20, display: "flex", gap: 10, flexDirection: "column", alignItems: "flex-end" }}>
+        <div style={{ display: "flex", gap: 10 }}>
+          {loading ? (
+            <div style={{ 
+              background: "#6c757d", 
+              color: "white", 
+              padding: "10px 20px", 
+              borderRadius: "6px",
+              fontWeight: "bold"
+            }}>
+              Checking shift...
+            </div>
+          ) : (
+            <>
+              {/* ✅ SHOW START SHIFT ONLY when NO active shift */}
+              {!isActiveShift && (
+                <button
+                  onClick={startShift}
+                  disabled={loading}
+                  style={{
+                    background: "#28a745",
+                    color: "white",
+                    padding: "10px 20px",
+                    border: "none",
+                    borderRadius: "6px",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+                  }}
+                >
+                  Start Shift
+                </button>
+              )}
+
+              {/* ✅ SHOW END SHIFT ONLY when ACTIVE shift */}
+              {isActiveShift && (
+                <button
+                  onClick={endShift}
+                  disabled={loading}
+                  style={{
+                    background: "#dc3545",
+                    color: "white",
+                    padding: "10px 20px",
+                    border: "none",
+                    borderRadius: "6px",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+                  }}
+                >
+                  End Shift
+                </button>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* ✅ Status badge ONLY when active */}
+        {isActiveShift && currentShiftNo && (
+          <div style={{ 
+            fontSize: "12px", 
+            color: "#155724", 
+            background: "#d4edda", 
+            padding: "6px 12px", 
+            borderRadius: "20px", 
+            border: "1px solid #c3e6cb",
+            fontWeight: "500"
+          }}>
+            ● Active Shift: <strong>{currentShiftNo}</strong> by <strong>{currentShiftOwner}</strong>
+          </div>
+        )}
+      </div>
+
       <ToastContainer>
         {toasts.map(t => (
           <Toast key={t.id} type={t.type}>
@@ -262,7 +392,6 @@ const markAsBilled = async () => {
         </FormGrid>
       </Card>
 
-      {/* TABLE: simplified columns */}
       <div style={{ marginTop: 20, overflowX: "auto" }}>
         {paginatedData.length === 0 ? (
           <div style={{ textAlign: "center", padding: "40px 20px", fontSize: "16px", color: "#666" }}>
@@ -299,7 +428,7 @@ const markAsBilled = async () => {
           </table>
         )}
       </div>
-      {/* Pagination */}
+
       {totalPages > 1 && (
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, marginTop: 20 }}>
           <button disabled={page === 1} onClick={() => setPage(p => p - 1)}>← Prev</button>
@@ -308,7 +437,7 @@ const markAsBilled = async () => {
         </div>
       )}
 
-      {/* Payment Modal (minimal, follows user's requirements) */}
+      {/* Payment Modal */}
       {showPaymentModal && selectedBill && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999 }} onClick={closePaymentModal}>
           <div style={{ width: 760, maxWidth: "calc(100% - 32px)", background: "white", borderRadius: 12, padding: 20 }} onClick={e => e.stopPropagation()}>
@@ -334,12 +463,10 @@ const markAsBilled = async () => {
               </Select>
             </div>
 
-            {/* Single payment UI */}
             {paymentModeType !== "multiple" && (
               <div style={{ marginBottom: 12 }}>
                 <Label>Amount</Label>
                 <Input type="number" step="0.01" value={singleAmount} onChange={e => setSingleAmount(e.target.value)} />
-
                 {paymentModeType !== "cash" && (
                   <>
                     <Label style={{ marginTop: 8 }}>Payment Details</Label>
@@ -349,7 +476,6 @@ const markAsBilled = async () => {
               </div>
             )}
 
-            {/* Multiple payments UI */}
             {paymentModeType === "multiple" && (
               <div style={{ marginBottom: 12 }}>
                 {multiplePayments.map((p, idx) => (
@@ -358,7 +484,6 @@ const markAsBilled = async () => {
                       <Label>Amount</Label>
                       <Input type="number" step="0.01" value={p.amount} onChange={e => updateMultiPayment(idx, "amount", e.target.value)} />
                     </div>
-
                     <div style={{ width: 140 }}>
                       <Label>Method</Label>
                       <Select value={p.method} onChange={e => updateMultiPayment(idx, "method", e.target.value)}>
@@ -367,12 +492,10 @@ const markAsBilled = async () => {
                         <option value="upi">UPI</option>
                       </Select>
                     </div>
-
                     <div style={{ flex: 1 }}>
                       <Label>Payment Details</Label>
                       <Input type="text" value={p.details} placeholder="TXN / Ref" onChange={e => updateMultiPayment(idx, "details", e.target.value)} />
                     </div>
-
                     <div>
                       {multiplePayments.length > 1 && (
                         <Button onClick={() => removeMultiPayment(idx)}>Remove</Button>
@@ -380,21 +503,18 @@ const markAsBilled = async () => {
                     </div>
                   </div>
                 ))}
-
                 <div>
                   <Button onClick={addMultiPayment}>+ Add Payment</Button>
                 </div>
               </div>
             )}
 
-            {/* Totals and submit */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #eee", paddingTop: 12 }}>
               <div>
                 <div style={{ fontWeight: 700 }}>Bill Amount: ₹{selectedBill.net_amount ?? selectedBill.total}</div>
                 <div style={{ marginTop: 6 }}>Total Paid: ₹{calculateTotalPaidFromUI().toFixed(2)}</div>
                 <div style={{ marginTop: 6 }}>Balance: ₹{((selectedBill.net_amount ?? selectedBill.total) - calculateTotalPaidFromUI()).toFixed(2)}</div>
               </div>
-
               <div>
                 <Button onClick={markAsBilled}>Confirm Payment</Button>
               </div>
