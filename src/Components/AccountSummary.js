@@ -697,11 +697,19 @@ export default function AccountSummaryWithDetails() {
 
   const overallTotals = calculateOverallTotals();
 
-  const formatDateTime = (dt) =>
-    dt ? new Date(dt).toLocaleString("en-IN", {
-      dateStyle: 'medium',
-      timeStyle: 'short'
-    }) : "-";
+  const formatDateTime = (dt) => {
+  if (!dt) return "-";
+
+  const dateObj = new Date(dt.includes("Z") ? dt : dt + "Z");
+
+  return new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    dateStyle: "medium",
+    timeStyle: "medium",
+  }).format(dateObj);
+};
+
+
 
   const formatCurrency = (amt) =>
     new Intl.NumberFormat("en-IN", {
@@ -769,7 +777,7 @@ export default function AccountSummaryWithDetails() {
   newWindow.document.write(`
     <html>
       <head>
-        <title>Shift Summary Table</title>
+        <title>ER-ShiftWise Summary Table</title>
         <style>
           body {
             font-family: Arial, sans-serif;
@@ -798,7 +806,7 @@ export default function AccountSummaryWithDetails() {
         </style>
       </head>
       <body>
-        <h2>Shift Account Summary (${fromDate} to ${toDate})</h2>
+        <h2>ER-ShiftWise Account Summary (${fromDate} to ${toDate})</h2>
         <table>
           <thead>
             <tr>

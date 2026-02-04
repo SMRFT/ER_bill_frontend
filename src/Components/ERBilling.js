@@ -46,6 +46,9 @@ export default function ERBilling() {
   const [procedures, setProcedures] = useState([]);
   const [doctors, setDoctors] = useState([]);
   const [selectedProcedures, setSelectedProcedures] = useState([]);
+  const [procedureSearch, setProcedureSearch] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
+
 
   /* ---------------- Toast State ---------------- */
   const [toasts, setToasts] = useState([]);
@@ -174,6 +177,21 @@ export default function ERBilling() {
     setDiscountAmount(discount);
     setFinalAmount(totalAmount - discount);
   }, [discountType, discountValue, totalAmount]);
+
+  const filteredProcedures = procedures.filter((p) =>
+  p.procedure_name.toLowerCase().includes(procedureSearch.toLowerCase())
+);
+
+useEffect(() => {
+  const handleClickOutside = (e) => {
+    if (!e.target.closest(".procedure-search-box")) {
+      setShowDropdown(false);
+    }
+  };
+
+  document.addEventListener("click", handleClickOutside);
+  return () => document.removeEventListener("click", handleClickOutside);
+}, []);
 
   const printBill = (data) => {
     const printWindow = window.open("", "_blank");
@@ -335,6 +353,17 @@ export default function ERBilling() {
 
   /* ---------------- Submit ---------------- */
   const handleSubmit = async () => {
+    // ✅ UHID validation
+  if (!form.uhid || form.uhid.trim() === "") {
+    showToast("Fill the UHID field while submitting", "error");
+    return;
+  }
+
+  // (Optional but recommended)
+  if (selectedProcedures.length === 0) {
+    showToast("Please add at least one procedure", "error");
+    return;
+  }
     try {
       const cleanProcedures = selectedProcedures.map(item => ({
         procedure_name: item.procedure_name,
@@ -496,18 +525,68 @@ export default function ERBilling() {
           {/* Procedure Selection */}
           <SectionTitle>Procedure Selection</SectionTitle>
           <FormGrid style={{ gridTemplateColumns: '1fr' }}>
-            <FormGroup>
+            <FormGroup style={{ width: "100%" }}>
               <Label>Select Procedure</Label>
-              <Select onChange={handleProcedureSelect}>
-                <option value="">-- Select a Procedure --</option>
-                {procedures.map((item, i) => (
-                  <option key={i} value={item.procedure_name}>
-                    {item.procedure_name} - ₹{item.rate}
-                  </option>
-                ))}
-              </Select>
+
+              <div style={{ 
+                position: "relative",
+                width: "100%",
+                maxWidth: "400px"   // 🔥 Increase this value as needed
+              }}>
+                <Input
+                  type="text"
+                  placeholder="Search Procedure (e.g. IV, Inj, Scan...)"
+                  value={procedureSearch}
+                  onChange={(e) => {
+                    setProcedureSearch(e.target.value);
+                    setShowDropdown(true);
+                  }}
+                  onFocus={() => setShowDropdown(true)}
+                  style={{ width: "100%" }}   // ensures input fills container
+                />
+
+                {showDropdown && procedureSearch && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "100%",
+                      left: 0,
+                      right: 0,
+                      background: "#fff",
+                      border: "1px solid #ccc",
+                      maxHeight: "180px",
+                      overflowY: "auto",
+                      zIndex: 1000,
+                      width: "100%"   // dropdown matches new width
+                    }}
+                  >
+                    {filteredProcedures.length > 0 ? (
+                      filteredProcedures.map((item, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            padding: "8px",
+                            cursor: "pointer",
+                            borderBottom: "1px solid #eee",
+                          }}
+                          onClick={() => {
+                            handleProcedureSelect({ target: { value: item.procedure_name } });
+                            setProcedureSearch("");
+                            setShowDropdown(false);
+                          }}
+                        >
+                          {item.procedure_name} – ₹{item.rate}
+                        </div>
+                      ))
+                    ) : (
+                      <div style={{ padding: "8px" }}>No procedures found</div>
+                    )}
+                  </div>
+                )}
+              </div>
             </FormGroup>
           </FormGrid>
+
 
           {/* Selected Procedures Table */}
           {selectedProcedures.length > 0 && (

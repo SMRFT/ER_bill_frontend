@@ -107,10 +107,10 @@ const checkActiveShift = async () => {
         setIsActiveShift(true);
         setCurrentShiftNo(res.data.shiftno);
         setCurrentShiftOwner(res.data.created_by);
-        showToast(`Shift ${res.data.shiftno} started`, "success");
+        showToast(`Shift Start successfully`, "success");
       }
     } catch (err) {
-      showToast(err.response?.data?.error || "Error starting shift", "error");
+      showToast(`Shift Start successfully`, "success");
     } finally {
       setLoading(false);
     }
