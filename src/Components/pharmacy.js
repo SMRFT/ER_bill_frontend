@@ -44,6 +44,8 @@ export default function Pharmacy() {
   const [loading, setLoading] = useState(false);
   const [currentShiftNo, setCurrentShiftNo] = useState(null);
   const [currentShiftOwner, setCurrentShiftOwner] = useState(null);
+  const [currentShiftOwnerName, setCurrentShiftOwnerName] = useState(null);
+
 
   // Payment UI state
   const [paymentModeType, setPaymentModeType] = useState("cash");
@@ -55,6 +57,15 @@ export default function Pharmacy() {
 
   const perPage = 10;
 
+  const loggedInUserId = localStorage.getItem("employeeId");
+  console.log(loggedInUserId)
+
+const isMyActiveShift =
+  isActiveShift && currentShiftOwner === loggedInUserId;
+
+  const loggedInUserName = localStorage.getItem("name");
+
+
   // Toast helpers
   const showToast = (message, type = "success") => {
     const id = Date.now() + Math.random();
@@ -63,7 +74,7 @@ export default function Pharmacy() {
   };
   const removeToast = id => setToasts(prev => prev.filter(t => t.id !== id));
 
-  const loggedInUserId = localStorage.getItem("auth-user-id");
+
 
   useEffect(() => {
     fetchBilling(date);
@@ -79,11 +90,16 @@ const checkActiveShift = async () => {
     const res = await apiRequest(`${ERbaseurl}get_active_shift/`, "GET");
     
     // ✅ FIXED: Accessing res.data based on your shared JSON structure
-    if (res.success && res.data && res.data.is_active) {
-      setIsActiveShift(true);
-      setCurrentShiftNo(res.data.shiftno);
-      setCurrentShiftOwner(res.data.created_by);
-    } else {
+ if (res.success && res.data && res.data.is_active) {
+  setIsActiveShift(true);
+  setCurrentShiftNo(res.data.shiftno);
+  setCurrentShiftOwner(res.data.created_by);
+
+  // ✅ NEW: store shift owner NAME
+  setCurrentShiftOwnerName(res.data.created_by_name);
+}
+
+ else {
       setIsActiveShift(false);
       setCurrentShiftNo(null);
     }
@@ -280,60 +296,59 @@ const checkActiveShift = async () => {
       {/* ✅ PERFECT LOGIC: Show ONLY ONE button based on shift status */}
       <div style={{ position: "absolute", top: 20, right: 20, display: "flex", gap: 10, flexDirection: "column", alignItems: "flex-end" }}>
         <div style={{ display: "flex", gap: 10 }}>
-          {loading ? (
-            <div style={{ 
-              background: "#6c757d", 
-              color: "white", 
-              padding: "10px 20px", 
-              borderRadius: "6px",
-              fontWeight: "bold"
-            }}>
-              Checking shift...
-            </div>
-          ) : (
-            <>
-              {/* ✅ SHOW START SHIFT ONLY when NO active shift */}
-              {!isActiveShift && (
-                <button
-                  onClick={startShift}
-                  disabled={loading}
-                  style={{
-                    background: "#28a745",
-                    color: "white",
-                    padding: "10px 20px",
-                    border: "none",
-                    borderRadius: "6px",
-                    fontWeight: "bold",
-                    cursor: "pointer",
-                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
-                  }}
-                >
-                  Start Shift
-                </button>
-              )}
+  {loading ? (
+    <div style={{
+      background: "#6c757d",
+      color: "white",
+      padding: "10px 20px",
+      borderRadius: "6px",
+      fontWeight: "bold"
+    }}>
+      Checking shift...
+    </div>
+  ) : (
+    <>
+      {/* ✅ START SHIFT: only when NO active shift */}
+      {!isActiveShift && (
+        <button
+          onClick={startShift}
+          disabled={loading}
+          style={{
+            background: "#28a745",
+            color: "white",
+            padding: "10px 20px",
+            border: "none",
+            borderRadius: "6px",
+            fontWeight: "bold",
+            cursor: "pointer"
+          }}
+        >
+          Start Shift
+        </button>
+      )}
 
-              {/* ✅ SHOW END SHIFT ONLY when ACTIVE shift */}
-              {isActiveShift && (
-                <button
-                  onClick={endShift}
-                  disabled={loading}
-                  style={{
-                    background: "#dc3545",
-                    color: "white",
-                    padding: "10px 20px",
-                    border: "none",
-                    borderRadius: "6px",
-                    fontWeight: "bold",
-                    cursor: "pointer",
-                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
-                  }}
-                >
-                  End Shift
-                </button>
-              )}
-            </>
-          )}
-        </div>
+      {/* ✅ END SHIFT: only for shift owner */}
+      {isActiveShift && currentShiftOwner === loggedInUserId && (
+        <button
+          onClick={endShift}
+          disabled={loading}
+          style={{
+            background: "#dc3545",
+            color: "white",
+            padding: "10px 20px",
+            border: "none",
+            borderRadius: "6px",
+            fontWeight: "bold",
+            cursor: "pointer"
+          }}
+        >
+          End Shift
+        </button>
+      )}
+    </>
+  )}
+</div>
+
 
         {/* ✅ Status badge ONLY when active */}
         {isActiveShift && currentShiftNo && (
@@ -346,7 +361,9 @@ const checkActiveShift = async () => {
             border: "1px solid #c3e6cb",
             fontWeight: "500"
           }}>
-            ● Active Shift: <strong>{currentShiftNo}</strong> by <strong>{currentShiftOwner}</strong>
+            ● Active Shift: <strong>{currentShiftNo}</strong> by{" "}
+<strong>{currentShiftOwnerName || currentShiftOwner}</strong>
+
           </div>
         )}
       </div>

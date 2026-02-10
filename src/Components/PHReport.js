@@ -178,20 +178,23 @@ const PharmacistShiftReport = () => {
     }
   };
 
+  
+
   const exportToExcel = () => {
     if (report.length === 0) return alert("No data to export");
 
-    const excelData = report.map((row) => ({
-      "Shift No": row.shiftno,
-      "Start Time": formatDate(row.starttime),
-      "End Time": formatDate(row.endtime),
-      "Cash (₹)": row.cash_total,
-      "Bank (₹)": row.bank_total,
-      "Grand Total (₹)": row.grand_total,
-    }));
+   const excelData = report.map(r => ({
+  "Shift No": r.shiftno,
+  "Collected By": r.collected_by,
+  "Cash": r.cash_total,
+  "Card": r.card_total,
+  "UPI": r.upi_total,
+  "Bank": r.bank_total,
+  "Grand Total": r.grand_total
+}));
 
-    const totalCash = report.reduce((s, r) => s + r.cash_total, 0);
-    const totalBank = report.reduce((s, r) => s + r.bank_total, 0);
+
+   
 
     excelData.push({
       "Shift No": "TOTAL",
@@ -212,8 +215,11 @@ const PharmacistShiftReport = () => {
     fetchReport();
   }, []);
 
-  const totalCash = report.reduce((s, r) => s + r.cash_total, 0);
-  const totalBank = report.reduce((s, r) => s + r.bank_total, 0);
+  const totalCash = report.reduce((s, r) => s + (r.cash_total || 0), 0);
+const totalCard = report.reduce((s, r) => s + (r.card_total || 0), 0);
+const totalUpi  = report.reduce((s, r) => s + (r.upi_total || 0), 0);
+const totalBank = report.reduce((s, r) => s + (r.bank_total || 0), 0);
+
 
   return (
     <Container>
@@ -242,8 +248,11 @@ const PharmacistShiftReport = () => {
               <Th>Start</Th>
               <Th>End</Th>
               <Th>Cash</Th>
-              <Th>Bank</Th>
+              <Th>Card</Th>
+              <Th>UPI</Th>
+              <Th>Bank(UPI+Card)</Th>
               <Th>Grand Total</Th>
+              <Th>Collected By</Th>
             </tr>
           </thead>
           <tbody>
@@ -254,23 +263,30 @@ const PharmacistShiftReport = () => {
             ) : (
               report.map((row, i) => (
                 <Tr key={i}>
-                  <Td>{row.shiftno}</Td>
-                  <Td>{formatDate(row.starttime)}</Td>
-                  <Td>{formatDate(row.endtime)}</Td>
-                  <Td><CurrencyText>₹ {row.cash_total}</CurrencyText></Td>
-                  <Td><CurrencyText>₹ {row.bank_total}</CurrencyText></Td>
-                  <Td><CurrencyText>₹ {row.grand_total}</CurrencyText></Td>
-                </Tr>
+  <Td>{row.shiftno}</Td>
+  <Td>{formatDate(row.starttime)}</Td>
+  <Td>{formatDate(row.endtime)}</Td>
+  <Td>₹ {row.cash_total}</Td>
+  <Td>₹ {row.card_total}</Td>
+  <Td>₹ {row.upi_total}</Td>
+  <Td>₹ {row.bank_total}</Td>
+  <Td>₹ {row.grand_total}</Td>
+  <Td>{row.collected_by}</Td>
+</Tr>
+
               ))
             )}
 
             {report.length > 0 && (
               <FooterRow>
-                <Td colSpan="3">TOTAL</Td>
-                <Td>₹ {totalCash.toFixed(2)}</Td>
-                <Td>₹ {totalBank.toFixed(2)}</Td>
-                <Td>₹ {(totalCash + totalBank).toFixed(2)}</Td>
-              </FooterRow>
+          <Td colSpan="3">TOTAL</Td>
+          <Td>₹ {totalCash.toFixed(2)}</Td>
+          <Td>₹ {totalCard.toFixed(2)}</Td>
+          <Td>₹ {totalUpi.toFixed(2)}</Td>
+          <Td>₹ {totalBank.toFixed(2)}</Td>
+          <Td>₹ {(totalCash + totalBank).toFixed(2)}</Td>
+        </FooterRow>
+
             )}
           </tbody>
         </Table>

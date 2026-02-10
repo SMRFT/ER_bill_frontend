@@ -345,7 +345,8 @@ else if (userRole === "ER Pharmacy") {
     section: 'Department',
     items: [
       { path: '/Pharmacy', icon: '💊', text: 'Pharmacy' },
-      { path: '/PHReport', icon: '🧾', text: 'PHReport' }
+      { path: '/PHReport', icon: '🧾', text: 'PHReport' },
+      { path: '/ViewBills', icon: '🧾', text: 'ViewBills' }
     ]
   });
 }

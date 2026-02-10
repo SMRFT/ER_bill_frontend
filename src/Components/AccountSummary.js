@@ -167,6 +167,59 @@ const BackButton = styled(ViewButton)`
   }
 `;
 
+const SearchInput = styled.input`
+  padding: 12px 16px;
+  border: 2px solid #e9d5ff;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #0f172a;
+  font-family: 'Outfit', sans-serif;
+  transition: all 0.2s ease;
+  background: #faf5ff;
+  min-width: 250px;
+
+  &:focus {
+    outline: none;
+    border-color: #C06FA2;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(192, 111, 162, 0.1);
+  }
+
+  &:hover {
+    border-color: #d8b4fe;
+  }
+
+  &::placeholder {
+    color: #94a3b8;
+  }
+`;
+
+const SelectInput = styled.select`
+  padding: 12px 16px;
+  border: 2px solid #e9d5ff;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f172a;
+  font-family: 'Outfit', sans-serif;
+  transition: all 0.2s ease;
+  background: #faf5ff;
+  cursor: pointer;
+  min-width: 150px;
+
+  &:focus {
+    outline: none;
+    border-color: #C06FA2;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(192, 111, 162, 0.1);
+  }
+
+  &:hover {
+    border-color: #d8b4fe;
+  }
+`;
+
 const TotalsRow = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -654,6 +707,8 @@ export default function AccountSummaryWithDetails() {
   const [toDate, setToDate] = useState(new Date().toISOString().split("T")[0]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('cards'); // 'cards' or 'table'
+  const [searchText, setSearchText] = useState("");
+  const [paymentFilter, setPaymentFilter] = useState("all"); // 'all', 'cash', 'bank'
 
   useEffect(() => {
     fetchSummary();
@@ -697,16 +752,66 @@ export default function AccountSummaryWithDetails() {
 
   const overallTotals = calculateOverallTotals();
 
-  const formatDateTime = (dt) => {
-  if (!dt) return "-";
+  // Filter data based on search text and payment filter
+  const filteredData = data.filter(shift => {
+    // Search filter - check employee name and patient names
+    const searchLower = searchText.toLowerCase();
+    const matchesSearch = searchText === "" || 
+      shift.employee_name?.toLowerCase().includes(searchLower) ||
+      shift.patients?.some(patient => 
+        patient.patientname?.toLowerCase().includes(searchLower)
+      );
 
-  const dateObj = new Date(dt.includes("Z") ? dt : dt + "Z");
+    // Payment filter
+    let matchesPayment = true;
+    if (paymentFilter === "cash") {
+      matchesPayment = shift.cash_total > 0;
+    } else if (paymentFilter === "bank") {
+      matchesPayment = shift.digital_total > 0;
+    }
 
-  return new Intl.DateTimeFormat("en-IN", {
-    timeZone: "Asia/Kolkata",
-    dateStyle: "medium",
-    timeStyle: "medium",
-  }).format(dateObj);
+    return matchesSearch && matchesPayment;
+  });
+
+  // Calculate filtered totals
+  const calculateFilteredTotals = () => {
+    const totals = filteredData.reduce(
+      (acc, shift) => {
+        acc.cash += shift.cash_total || 0;
+        acc.bank += shift.digital_total || 0;
+        acc.total += shift.total_amount || 0;
+        return acc;
+      },
+      { cash: 0, bank: 0, total: 0 }
+    );
+    return totals;
+  };
+
+  const displayTotals = searchText || paymentFilter !== "all" ? calculateFilteredTotals() : overallTotals;
+
+ const formatDateTime = (dt) => {
+  if (!dt) return "-";
+
+  let dateObj;
+
+  // If datetime already has timezone info
+  if (dt.includes("Z") || dt.includes("+")) {
+    dateObj = new Date(dt);
+  } else {
+    // Assume UTC if timezone missing
+    dateObj = new Date(dt + "Z");
+  }
+
+  return dateObj.toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
 };
 
 
@@ -1213,15 +1318,15 @@ export default function AccountSummaryWithDetails() {
             <TotalsRow>
               <TotalCard>
                 <TotalLabel>Overall Cash Total</TotalLabel>
-                <TotalValue>{formatCurrency(overallTotals.cash)}</TotalValue>
+                <TotalValue>{formatCurrency(displayTotals.cash)}</TotalValue>
               </TotalCard>
               <TotalCard>
                 <TotalLabel>Overall Bank Total</TotalLabel>
-                <TotalValue>{formatCurrency(overallTotals.bank)}</TotalValue>
+                <TotalValue>{formatCurrency(displayTotals.bank)}</TotalValue>
               </TotalCard>
               <TotalCard primary>
                 <TotalLabel>Overall Grand Total</TotalLabel>
-                <TotalValue large primary>{formatCurrency(overallTotals.total)}</TotalValue>
+                <TotalValue large primary>{formatCurrency(displayTotals.total)}</TotalValue>
               </TotalCard>
             </TotalsRow>
           )}
@@ -1246,7 +1351,7 @@ export default function AccountSummaryWithDetails() {
               </Tr>
             </Thead>
             <Tbody>
-              {data.map((shift, shiftIdx) => {
+              {filteredData.map((shift, shiftIdx) => {
                 const patientCount = shift.patients?.length || 0;
                 
                 return shift.patients?.map((patient, patIdx) => (
@@ -1333,19 +1438,42 @@ export default function AccountSummaryWithDetails() {
             </ViewButton>
           </FilterRow>
 
+          <FilterRow>
+            <FilterLabel>
+              Search
+              <SearchInput
+                type="text"
+                placeholder="Search by Employee or Patient Name..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+              />
+            </FilterLabel>
+            <FilterLabel>
+              Payment Type
+              <SelectInput
+                value={paymentFilter}
+                onChange={(e) => setPaymentFilter(e.target.value)}
+              >
+                <option value="all">All</option>
+                <option value="cash">Cash</option>
+                <option value="bank">Bank</option>
+              </SelectInput>
+            </FilterLabel>
+          </FilterRow>
+
           {!loading && data.length > 0 && (
             <TotalsRow>
               <TotalCard>
                 <TotalLabel>Overall Cash Total</TotalLabel>
-                <TotalValue>{formatCurrency(overallTotals.cash)}</TotalValue>
+                <TotalValue>{formatCurrency(displayTotals.cash)}</TotalValue>
               </TotalCard>
               <TotalCard>
                 <TotalLabel>Overall Bank Total</TotalLabel>
-                <TotalValue>{formatCurrency(overallTotals.bank)}</TotalValue>
+                <TotalValue>{formatCurrency(displayTotals.bank)}</TotalValue>
               </TotalCard>
               <TotalCard primary>
                 <TotalLabel>Overall Grand Total</TotalLabel>
-                <TotalValue large primary>{formatCurrency(overallTotals.total)}</TotalValue>
+                <TotalValue large primary>{formatCurrency(displayTotals.total)}</TotalValue>
               </TotalCard>
             </TotalsRow>
           )}
@@ -1358,9 +1486,14 @@ export default function AccountSummaryWithDetails() {
             <EmptyIcon>📊</EmptyIcon>
             <EmptyText>No shifts found for the selected date range</EmptyText>
           </EmptyState>
+        ) : filteredData.length === 0 ? (
+          <EmptyState>
+            <EmptyIcon>🔍</EmptyIcon>
+            <EmptyText>No results match your search criteria</EmptyText>
+          </EmptyState>
         ) : (
           <ShiftsContainer>
-            {data.map((shift, idx) => (
+            {filteredData.map((shift, idx) => (
               <ShiftCard key={idx} expanded={expandedShift === idx}>
                 <ShiftHeader
                   expanded={expandedShift === idx}

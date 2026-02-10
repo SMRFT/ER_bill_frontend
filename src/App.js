@@ -8,6 +8,7 @@ import AccountSummary from "./Components/AccountSummary";
 import PrintBill from "./Components/PrintBill";
 import ERReport from "./Components/ERReport";
 import PHReport from "./Components/PHReport";
+import ViewBills from "./Components/ViewBills";
 
 function AppRoutes() {
   const navigate = useNavigate();
@@ -38,6 +39,7 @@ function AppRoutes() {
         <Route path="/PrintBill" element={<PrintBill />} />
         <Route path="/ERReport" element={<ERReport />} />
         <Route path="/PHReport" element={<PHReport />} />
+         <Route path="/ViewBills" element={<ViewBills />} />
       </Routes>
     </Sidebar>
   );
