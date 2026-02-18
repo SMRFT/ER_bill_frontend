@@ -106,12 +106,36 @@ const Input = styled.input`
 
 const SearchRow = styled.div`
   display: grid;
-  grid-template-columns: 1fr 1fr auto;
+  grid-template-columns: 1fr 1fr auto auto;
   gap: 16px;
   align-items: end;
 
   @media (max-width: 768px) {
     grid-template-columns: 1fr;
+  }
+`;
+
+const PrintButton = styled.button`
+  padding: 12px 32px;
+  background: linear-gradient(135deg, #4a9f6f 0%, #2d7a50 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(74, 159, 111, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(74, 159, 111, 0.4);
+  }
+
+  &:active {
+    transform: translateY(0);
   }
 `;
 
@@ -310,6 +334,68 @@ const ViewBills = () => {
     }
   };
 
+  /* ===================== VIEW PRINT ===================== */
+
+  const handleViewPrint = () => {
+    const printWindow = window.open("", "_blank");
+    const tableRows = rows
+      .map(
+        (row) => `
+        <tr>
+          <td>${row.bill_date || ""}</td>
+          <td>${row.bill_time || ""}</td>
+          <td>${row.patientname || ""}</td>
+          <td>${row.uhid || ""}</td>
+          <td>${formatPaymentMode(row.payment_mode)}</td>
+          <td>${row.status || ""}</td>
+          <td>${row.billnumber || ""}</td>
+          <td>₹${row.total || ""}</td>
+          <td>${row.shiftno || ""}</td>
+          <td>${row.billed_by || ""}</td>
+        </tr>`
+      )
+      .join("");
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Bills Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1 { text-align: center; color: #9B4F7E; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; font-size: 13px; }
+            th { background: linear-gradient(135deg, #C06FA2, #9B4F7E); color: white; padding: 10px 12px; text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+            td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; color: #2d3748; }
+            tr:hover td { background: #f7fafc; }
+            @media print { body { padding: 0; } }
+          </style>
+        </head>
+        <body>
+          <h1>Bills Report</h1>
+          <table>
+            <thead>
+              <tr>
+                <th>Bill Date</th>
+                <th>Bill Time</th>
+                <th>Patient Name</th>
+                <th>UHID No</th>
+                <th>Payment Mode</th>
+                <th>Status</th>
+                <th>Bill Number</th>
+                <th>Total Amount</th>
+                <th>Shift No</th>
+                <th>Billed By</th>
+              </tr>
+            </thead>
+            <tbody>${tableRows}</tbody>
+          </table>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   /* ===================== AUTO LOAD & DATE CHANGE ===================== */
 
   useEffect(() => {
@@ -398,6 +484,7 @@ const ViewBills = () => {
             </InputGroup>
 
             <Button onClick={() => fetchBills(true)}>🔍 Search</Button>
+            <PrintButton onClick={handleViewPrint} disabled={rows.length === 0}>🖨️ View Print</PrintButton>
           </SearchRow>
 
           {message && <Message>{message}</Message>}

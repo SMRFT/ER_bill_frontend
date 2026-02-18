@@ -48,6 +48,8 @@ export default function ERBilling() {
   const [selectedProcedures, setSelectedProcedures] = useState([]);
   const [procedureSearch, setProcedureSearch] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
 
 
   /* ---------------- Toast State ---------------- */
@@ -353,83 +355,93 @@ useEffect(() => {
 
   /* ---------------- Submit ---------------- */
   const handleSubmit = async () => {
-    // ✅ UHID validation
+  // 🔒 Prevent double click
+  if (isSubmitting) return;
+
+  // Validation
   if (!form.uhid || form.uhid.trim() === "") {
     showToast("Fill the UHID field while submitting", "error");
     return;
   }
 
-  // (Optional but recommended)
   if (selectedProcedures.length === 0) {
     showToast("Please add at least one procedure", "error");
     return;
   }
-    try {
-      const cleanProcedures = selectedProcedures.map(item => ({
-        procedure_name: item.procedure_name,
-        rate: Number(item.rate),
-        unit: Number(item.unit),
-        total: Number(item.total)
-      }));
 
-      const payload = {
+  try {
+    // 🔒 Disable submit immediately
+    setIsSubmitting(true);
+
+    const cleanProcedures = selectedProcedures.map(item => ({
+      procedure_name: item.procedure_name,
+      rate: Number(item.rate),
+      unit: Number(item.unit),
+      total: Number(item.total),
+    }));
+
+    const payload = {
+      ...form,
+      procedures: cleanProcedures,
+      total: totalAmount,
+      net_amount: finalAmount,
+      discount_amount: discountAmount,
+      discount_type: discountType,
+      discount_value: discountValue,
+    };
+
+    const response = await apiRequest(
+      `${ERbaseurl}erbilling/`,
+      "POST",
+      payload
+    );
+
+    if (response.success) {
+      showToast("Billing saved successfully!", "success");
+
+      const printData = {
         ...form,
-        procedures: cleanProcedures,
+        procedures: selectedProcedures,
         total: totalAmount,
         net_amount: finalAmount,
         discount_amount: discountAmount,
-        discount_type: discountType,
-        discount_value: discountValue,
+        date: new Date().toLocaleDateString(),
+        time: new Date().toLocaleTimeString(),
       };
 
-      const response = await apiRequest(`${ERbaseurl}erbilling/`, "POST", payload);
+      printBill(printData);
 
-      if (response.success) {
-        showToast("Billing saved successfully!", "success");
+      // Reset form
+      setForm({
+        uhid: "",
+        patientname: "",
+        age: "",
+        gender: "",
+        phonenumber: "",
+        billnumber: "",
+        doctorname: "",
+      });
 
-        const printData = {
-          ...form,
-          procedures: selectedProcedures,
-          total: totalAmount,
-          net_amount: finalAmount,
-          discount_amount: discountAmount,
-          discount_type: discountType,
-          discount_value: discountValue,
-          date: new Date().toLocaleDateString(),
-          time: new Date().toLocaleTimeString(),
-        };
+      setSelectedProcedures([]);
+      setDiscountType("percentage");
+      setDiscountValue(0);
 
-        printBill(printData);
-
-        // ⭐⭐⭐ RESET FORM AFTER SUBMIT ⭐⭐⭐
-        setForm({
-          uhid: "",
-          patientname: "",
-          age: "",
-          gender: "",
-          phonenumber: "",
-          billnumber: "",
-          doctorname: "",
-        });
-
-        setSelectedProcedures([]);
-        setDiscountType("percentage");
-        setDiscountValue(0);
-
-        // Generate NEW automatic bill number
-        fetchNextBillNumber();
-
-      } else {
-        showToast(
-          "Error saving billing: " + (response.error || "Unknown error"),
-          "error"
-        );
-      }
-    } catch (error) {
-      console.error(error);
-      showToast("Error saving billing. Please try again.", "error");
+      // 🔁 Load NEXT bill number
+      await fetchNextBillNumber();
+    } else {
+      showToast(
+        "Error saving billing: " + (response.error || "Unknown error"),
+        "error"
+      );
     }
-  };
+  } catch (error) {
+    console.error(error);
+    showToast("Error saving billing. Please try again.", "error");
+  } finally {
+    // 🔓 Re-enable submit ONLY after bill number reload / error
+    setIsSubmitting(false);
+  }
+};
 
   /* ---------------- UI ---------------- */
   return (
@@ -686,9 +698,10 @@ useEffect(() => {
             </>
           )}
 
-          <SubmitButton onClick={handleSubmit}>
-            Submit & Print Bill
-          </SubmitButton>
+         <SubmitButton onClick={handleSubmit} disabled={isSubmitting}>
+          {isSubmitting ? "Processing..." : "Submit & Print Bill"}
+        </SubmitButton>
+
         </Card>
       </PageContainer>
     </>

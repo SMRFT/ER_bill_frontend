@@ -140,7 +140,7 @@ const formatDate = (dt) => {
   return new Intl.DateTimeFormat("en-IN", {
     timeZone: "Asia/Kolkata",
     day: "2-digit",
-    month: "short",
+    month: "2-digit",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
@@ -185,12 +185,14 @@ const PharmacistShiftReport = () => {
 
    const excelData = report.map(r => ({
   "Shift No": r.shiftno,
-  "Collected By": r.collected_by,
+  "Start Date&Time": formatDate(r.starttime),
+  "End Date&Time": formatDate(r.endtime),
   "Cash": r.cash_total,
   "Card": r.card_total,
   "UPI": r.upi_total,
-  "Bank": r.bank_total,
-  "Grand Total": r.grand_total
+  "Bank(UPI+Card)": r.bank_total,
+  "Grand Total": r.grand_total,
+  "Collected By": r.collected_by,
 }));
 
 
@@ -198,14 +200,33 @@ const PharmacistShiftReport = () => {
 
     excelData.push({
       "Shift No": "TOTAL",
-      "Start Time": "",
-      "End Time": "",
-      "Cash (₹)": totalCash.toFixed(2),
-      "Bank (₹)": totalBank.toFixed(2),
-      "Grand Total (₹)": (totalCash + totalBank).toFixed(2),
+      "Start Date&Time": "",
+      "End Date&Time": "",
+      "Cash": totalCash.toFixed(2),
+      "Card": totalCard.toFixed(2),
+      "UPI": totalUpi.toFixed(2),
+      "Bank(UPI+Card)": totalBank.toFixed(2),
+      "Grand Total": (totalCash + totalBank).toFixed(2),
+      "Collected By": "",
     });
 
     const ws = XLSX.utils.json_to_sheet(excelData);
+
+    // Apply alignment: headers center, data rows left
+    const range = XLSX.utils.decode_range(ws["!ref"]);
+    for (let R = range.s.r; R <= range.e.r; R++) {
+      for (let C = range.s.c; C <= range.e.c; C++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+        if (!ws[cellAddress]) continue;
+        ws[cellAddress].s = {
+          alignment: {
+            horizontal: R === 0 ? "center" : "left",
+            vertical: "center",
+          },
+        };
+      }
+    }
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Shift Report");
     XLSX.writeFile(wb, `Pharmacist_Report_${fromDate}_to_${toDate}.xlsx`);
@@ -215,10 +236,10 @@ const PharmacistShiftReport = () => {
     fetchReport();
   }, []);
 
-  const totalCash = report.reduce((s, r) => s + (r.cash_total || 0), 0);
-const totalCard = report.reduce((s, r) => s + (r.card_total || 0), 0);
-const totalUpi  = report.reduce((s, r) => s + (r.upi_total || 0), 0);
-const totalBank = report.reduce((s, r) => s + (r.bank_total || 0), 0);
+      const totalCash = report.reduce((s, r) => s + (r.cash_total || 0), 0);
+      const totalCard = report.reduce((s, r) => s + (r.card_total || 0), 0);
+      const totalUpi  = report.reduce((s, r) => s + (r.upi_total || 0), 0);
+      const totalBank = report.reduce((s, r) => s + (r.bank_total || 0), 0);
 
 
   return (
@@ -245,8 +266,8 @@ const totalBank = report.reduce((s, r) => s + (r.bank_total || 0), 0);
           <thead>
             <tr>
               <Th>Shift No</Th>
-              <Th>Start</Th>
-              <Th>End</Th>
+              <Th>Start Date&Time</Th>
+              <Th>End Date&Time</Th>
               <Th>Cash</Th>
               <Th>Card</Th>
               <Th>UPI</Th>
@@ -263,16 +284,16 @@ const totalBank = report.reduce((s, r) => s + (r.bank_total || 0), 0);
             ) : (
               report.map((row, i) => (
                 <Tr key={i}>
-  <Td>{row.shiftno}</Td>
-  <Td>{formatDate(row.starttime)}</Td>
-  <Td>{formatDate(row.endtime)}</Td>
-  <Td>₹ {row.cash_total}</Td>
-  <Td>₹ {row.card_total}</Td>
-  <Td>₹ {row.upi_total}</Td>
-  <Td>₹ {row.bank_total}</Td>
-  <Td>₹ {row.grand_total}</Td>
-  <Td>{row.collected_by}</Td>
-</Tr>
+              <Td>{row.shiftno}</Td>
+              <Td>{formatDate(row.starttime)}</Td>
+              <Td>{formatDate(row.endtime)}</Td>
+              <Td>₹ {row.cash_total}</Td>
+              <Td>₹ {row.card_total}</Td>
+              <Td>₹ {row.upi_total}</Td>
+              <Td>₹ {row.bank_total}</Td>
+              <Td>₹ {row.grand_total}</Td>
+              <Td>{row.collected_by}</Td>
+            </Tr>
 
               ))
             )}
