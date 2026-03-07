@@ -35,7 +35,6 @@ export default function ERBilling() {
   const [form, setForm] = useState({
     uhid: "",
     patientname: "",
-    dateofbirth: "",
     age: "",
     gender: "",
     phonenumber: "",
@@ -47,6 +46,11 @@ export default function ERBilling() {
   const [procedures, setProcedures] = useState([]);
   const [doctors, setDoctors] = useState([]);
   const [selectedProcedures, setSelectedProcedures] = useState([]);
+  const [procedureSearch, setProcedureSearch] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+
 
   /* ---------------- Toast State ---------------- */
   const [toasts, setToasts] = useState([]);
@@ -135,35 +139,6 @@ export default function ERBilling() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  /* ---------------- Calculate Age from Date of Birth ---------------- */
-  const calculateAge = (dob) => {
-    if (!dob) return "";
-    
-    const birthDate = new Date(dob);
-    const today = new Date();
-    
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    
-    // Adjust age if birthday hasn't occurred this year
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    
-    return age;
-  };
-
-  const handleDOBChange = (e) => {
-    const dob = e.target.value;
-    const calculatedAge = calculateAge(dob);
-    
-    setForm({
-      ...form,
-      dateofbirth: dob,
-      age: calculatedAge
-    });
-  };
-
   /* ---------------- Add Procedure ---------------- */
   const handleProcedureSelect = (e) => {
     const name = e.target.value;
@@ -204,6 +179,21 @@ export default function ERBilling() {
     setDiscountAmount(discount);
     setFinalAmount(totalAmount - discount);
   }, [discountType, discountValue, totalAmount]);
+
+  const filteredProcedures = procedures.filter((p) =>
+  p.procedure_name.toLowerCase().includes(procedureSearch.toLowerCase())
+);
+
+useEffect(() => {
+  const handleClickOutside = (e) => {
+    if (!e.target.closest(".procedure-search-box")) {
+      setShowDropdown(false);
+    }
+  };
+
+  document.addEventListener("click", handleClickOutside);
+  return () => document.removeEventListener("click", handleClickOutside);
+}, []);
 
   const printBill = (data) => {
     const printWindow = window.open("", "_blank");
@@ -365,73 +355,93 @@ export default function ERBilling() {
 
   /* ---------------- Submit ---------------- */
   const handleSubmit = async () => {
-    try {
-      const cleanProcedures = selectedProcedures.map(item => ({
-        procedure_name: item.procedure_name,
-        rate: Number(item.rate),
-        unit: Number(item.unit),
-        total: Number(item.total)
-      }));
+  // 🔒 Prevent double click
+  if (isSubmitting) return;
 
-      const payload = {
+  // Validation
+  if (!form.uhid || form.uhid.trim() === "") {
+    showToast("Fill the UHID field while submitting", "error");
+    return;
+  }
+
+  if (selectedProcedures.length === 0) {
+    showToast("Please add at least one procedure", "error");
+    return;
+  }
+
+  try {
+    // 🔒 Disable submit immediately
+    setIsSubmitting(true);
+
+    const cleanProcedures = selectedProcedures.map(item => ({
+      procedure_name: item.procedure_name,
+      rate: Number(item.rate),
+      unit: Number(item.unit),
+      total: Number(item.total),
+    }));
+
+    const payload = {
+      ...form,
+      procedures: cleanProcedures,
+      total: totalAmount,
+      net_amount: finalAmount,
+      discount_amount: discountAmount,
+      discount_type: discountType,
+      discount_value: discountValue,
+    };
+
+    const response = await apiRequest(
+      `${ERbaseurl}erbilling/`,
+      "POST",
+      payload
+    );
+
+    if (response.success) {
+      showToast("Billing saved successfully!", "success");
+
+      const printData = {
         ...form,
-        procedures: cleanProcedures,
+        procedures: selectedProcedures,
         total: totalAmount,
         net_amount: finalAmount,
         discount_amount: discountAmount,
-        discount_type: discountType,
-        discount_value: discountValue,
+        date: new Date().toLocaleDateString(),
+        time: new Date().toLocaleTimeString(),
       };
 
-      const response = await apiRequest(`${ERbaseurl}erbilling/`, "POST", payload);
+      printBill(printData);
 
-      if (response.success) {
-        showToast("Billing saved successfully!", "success");
+      // Reset form
+      setForm({
+        uhid: "",
+        patientname: "",
+        age: "",
+        gender: "",
+        phonenumber: "",
+        billnumber: "",
+        doctorname: "",
+      });
 
-        const printData = {
-          ...form,
-          procedures: selectedProcedures,
-          total: totalAmount,
-          net_amount: finalAmount,
-          discount_amount: discountAmount,
-          discount_type: discountType,
-          discount_value: discountValue,
-          date: new Date().toLocaleDateString(),
-          time: new Date().toLocaleTimeString(),
-        };
+      setSelectedProcedures([]);
+      setDiscountType("percentage");
+      setDiscountValue(0);
 
-        printBill(printData);
-
-        // ⭐⭐⭐ RESET FORM AFTER SUBMIT ⭐⭐⭐
-        setForm({
-          uhid: "",
-          patientname: "",
-          dateofbirth: "",
-          age: "",
-          gender: "",
-          phonenumber: "",
-          billnumber: "",
-          doctorname: "",
-        });
-
-        setSelectedProcedures([]);
-        setDiscountType("percentage");
-        setDiscountValue(0);
-
-        // Generate NEW automatic bill number
-        fetchNextBillNumber();
-
-      } else {
-        showToast(
-          "Error saving billing: " + (response.error || "Unknown error"),
-          "error"
-        );
-      }
-    } catch (error) {
-      console.error(error);
-      showToast("Error saving billing. Please try again.", "error");
+      // 🔁 Load NEXT bill number
+      await fetchNextBillNumber();
+    } else {
+      showToast(
+        "Error saving billing: " + (response.error || "Unknown error"),
+        "error"
+      );
     }
-  };
+  } catch (error) {
+    console.error(error);
+    showToast("Error saving billing. Please try again.", "error");
+  } finally {
+    // 🔓 Re-enable submit ONLY after bill number reload / error
+    setIsSubmitting(false);
+  }
+};
 
   /* ---------------- UI ---------------- */
   return (
@@ -483,16 +493,7 @@ export default function ERBilling() {
               <Input name="patientname" value={form.patientname} onChange={handleChange} placeholder="Enter Patient Name" />
             </FormGroup>
 
-            <FormGroup>
-              <Label>Date of Birth</Label>
-              <Input 
-                type="date" 
-                name="dateofbirth" 
-                value={form.dateofbirth} 
-                onChange={handleDOBChange} 
-                max={today}
-              />
-            </FormGroup>
+           
 
             <FormGroup>
               <Label>Age</Label>
@@ -500,9 +501,8 @@ export default function ERBilling() {
                 type="number" 
                 name="age" 
                 value={form.age} 
-                readOnly 
-                placeholder="Auto-calculated" 
-                style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
+                onChange={handleChange} 
+                placeholder="Enter Age" 
               />
             </FormGroup>
 
@@ -537,18 +537,68 @@ export default function ERBilling() {
           {/* Procedure Selection */}
           <SectionTitle>Procedure Selection</SectionTitle>
           <FormGrid style={{ gridTemplateColumns: '1fr' }}>
-            <FormGroup>
+            <FormGroup style={{ width: "100%" }}>
               <Label>Select Procedure</Label>
-              <Select onChange={handleProcedureSelect}>
-                <option value="">-- Select a Procedure --</option>
-                {procedures.map((item, i) => (
-                  <option key={i} value={item.procedure_name}>
-                    {item.procedure_name} - ₹{item.rate}
-                  </option>
-                ))}
-              </Select>
+
+              <div style={{ 
+                position: "relative",
+                width: "100%",
+                maxWidth: "400px"   // 🔥 Increase this value as needed
+              }}>
+                <Input
+                  type="text"
+                  placeholder="Search Procedure (e.g. IV, Inj, Scan...)"
+                  value={procedureSearch}
+                  onChange={(e) => {
+                    setProcedureSearch(e.target.value);
+                    setShowDropdown(true);
+                  }}
+                  onFocus={() => setShowDropdown(true)}
+                  style={{ width: "100%" }}   // ensures input fills container
+                />
+
+                {showDropdown && procedureSearch && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "100%",
+                      left: 0,
+                      right: 0,
+                      background: "#fff",
+                      border: "1px solid #ccc",
+                      maxHeight: "180px",
+                      overflowY: "auto",
+                      zIndex: 1000,
+                      width: "100%"   // dropdown matches new width
+                    }}
+                  >
+                    {filteredProcedures.length > 0 ? (
+                      filteredProcedures.map((item, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            padding: "8px",
+                            cursor: "pointer",
+                            borderBottom: "1px solid #eee",
+                          }}
+                          onClick={() => {
+                            handleProcedureSelect({ target: { value: item.procedure_name } });
+                            setProcedureSearch("");
+                            setShowDropdown(false);
+                          }}
+                        >
+                          {item.procedure_name} – ₹{item.rate}
+                        </div>
+                      ))
+                    ) : (
+                      <div style={{ padding: "8px" }}>No procedures found</div>
+                    )}
+                  </div>
+                )}
+              </div>
             </FormGroup>
           </FormGrid>
+
 
           {/* Selected Procedures Table */}
           {selectedProcedures.length > 0 && (
@@ -648,9 +698,10 @@ export default function ERBilling() {
             </>
           )}
 
-          <SubmitButton onClick={handleSubmit}>
-            Submit & Print Bill
-          </SubmitButton>
+         <SubmitButton onClick={handleSubmit} disabled={isSubmitting}>
+          {isSubmitting ? "Processing..." : "Submit & Print Bill"}
+        </SubmitButton>
+
         </Card>
       </PageContainer>
     </>

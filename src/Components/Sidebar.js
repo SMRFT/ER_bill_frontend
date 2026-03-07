@@ -333,7 +333,7 @@ else if (userRole === "ER Nurse") {
   navigationItems.push({
     section: 'Emergency Department',
     items: [
-      { path: '/ERBilling', icon: '💰', text: 'ER Billing' },
+      { path: '/', icon: '💰', text: 'ER Billing' },
       { path: '/PrintBill', icon: '🖨️', text: 'Print Bill' }, 
       { path: '/ERReport', icon: '📋', text: 'ER Report' }
 
@@ -345,7 +345,8 @@ else if (userRole === "ER Pharmacy") {
     section: 'Department',
     items: [
       { path: '/Pharmacy', icon: '💊', text: 'Pharmacy' },
-      { path: '/AccountSummary', icon: '🧾', text: 'Account Summary' }
+      { path: '/PHReport', icon: '🧾', text: 'PHReport' },
+      { path: '/ViewBills', icon: '🧾', text: 'ViewBills' }
     ]
   });
 }
