@@ -329,14 +329,26 @@ if (userRole === "ER Admin") {
     
   );
 } 
+else if (userRole === "ER Super Admin") {
+  navigationItems.push({
+    section: 'Main',
+    items: [
+      // { path: '/', icon: '💰', text: 'ER Billing' },
+      { path: '/ERReport', icon: '📋', text: 'ER Report' },
+      { path: '/Billedit', icon: '✏️', text: 'Bill Edit' },
+      // { path: '/AccountSummary', icon: '🧾', text: 'Account Summary' }
+      { path: '/PHReport', icon: '🧾', text: 'PHReport' },
+
+    ]
+  });
+}
 else if (userRole === "ER Nurse") {
   navigationItems.push({
     section: 'Emergency Department',
     items: [
       { path: '/', icon: '💰', text: 'ER Billing' },
       { path: '/PrintBill', icon: '🖨️', text: 'Print Bill' }, 
-      { path: '/ERReport', icon: '📋', text: 'ER Report' }
-
+      { path: '/ERReport', icon: '📋', text: 'ER Report' },
     ]
   });
 } 
