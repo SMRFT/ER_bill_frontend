@@ -139,6 +139,29 @@ export default function ERBilling() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  /* ---------------- Calculate Procedure Total ---------------- */
+  const calculateProcedureTotal = (item, unitVal) => {
+    if (unitVal === "" || unitVal === null || unitVal === undefined) {
+      return Number(item.rate) || 0;
+    }
+    const units = Number(unitVal);
+    if (isNaN(units) || units <= 0) {
+      return 0;
+    }
+
+    const baseUnits = Number(item.base_units) || (item.procedure_name === "ER Charges (Per Hour)" ? 2 : null);
+    const incrementalRate = Number(item.incremental_rate) || (item.procedure_name === "ER Charges (Per Hour)" ? 250 : null);
+
+    if (baseUnits && incrementalRate) {
+      if (units <= baseUnits) {
+        return Number(item.rate);
+      }
+      return Number(item.rate) + (units - baseUnits) * incrementalRate;
+    }
+
+    return units * Number(item.rate);
+  };
+
   /* ---------------- Add Procedure ---------------- */
   const handleProcedureSelect = (e) => {
     const name = e.target.value;
@@ -149,7 +172,7 @@ export default function ERBilling() {
     if (found && !selectedProcedures.some((p) => p.procedure_name === name)) {
       setSelectedProcedures([
         ...selectedProcedures,
-        { ...found, unit: '', total: Number(found.rate) }
+        { ...found, unit: '', total: calculateProcedureTotal(found, '') }
       ]);
     }
   };
@@ -376,7 +399,7 @@ useEffect(() => {
     const cleanProcedures = selectedProcedures.map(item => ({
       procedure_name: item.procedure_name,
       rate: Number(item.rate),
-      unit: Number(item.unit),
+      unit: Number(item.unit) || 1,
       total: Number(item.total),
     }));
 
@@ -625,11 +648,16 @@ useEffect(() => {
                         type="text"
                         value={item.unit}
                         onChange={(e) => {
-                          const unit = Number(e.target.value);
+                          const val = e.target.value;
+                          if (val !== "" && !/^\d+$/.test(val)) return;
                           setSelectedProcedures((prev) =>
                             prev.map((p, i) =>
                               i === idx
-                                ? { ...p, unit, total: unit * Number(p.rate) }
+                                ? {
+                                    ...p,
+                                    unit: val,
+                                    total: calculateProcedureTotal(p, val),
+                                  }
                                 : p
                             )
                           );
