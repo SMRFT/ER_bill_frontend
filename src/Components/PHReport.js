@@ -79,7 +79,8 @@ const ExportButton = styled(Button)`
 const TableContainer = styled.div`
   background: #ffffff;
   border-radius: 12px;
-  overflow: hidden;
+  overflow: auto;
+  max-height: calc(100vh - 250px);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 `;
 
@@ -93,6 +94,9 @@ const Th = styled.th`
   color: white;
   padding: 16px;
   text-align: center;
+  position: sticky;
+  top: 0;
+  z-index: 10;
 `;
 
 const Td = styled.td`
@@ -178,25 +182,25 @@ const PharmacistShiftReport = () => {
     }
   };
 
-  
+
 
   const exportToExcel = () => {
     if (report.length === 0) return alert("No data to export");
 
-   const excelData = report.map(r => ({
-  "Shift No": r.shiftno,
-  "Start Date&Time": formatDate(r.starttime),
-  "End Date&Time": formatDate(r.endtime),
-  "Cash": r.cash_total,
-  "Card": r.card_total,
-  "UPI": r.upi_total,
-  "Bank(UPI+Card)": r.bank_total,
-  "Grand Total": r.grand_total,
-  "Collected By": r.collected_by,
-}));
+    const excelData = report.map(r => ({
+      "Shift No": r.shiftno,
+      "Start Date&Time": formatDate(r.starttime),
+      "End Date&Time": formatDate(r.endtime),
+      "Cash": r.cash_total,
+      "Card": r.card_total,
+      "UPI": r.upi_total,
+      "Bank(UPI+Card)": r.bank_total,
+      "Grand Total": r.grand_total,
+      "Collected By": r.collected_by,
+    }));
 
 
-   
+
 
     excelData.push({
       "Shift No": "TOTAL",
@@ -236,10 +240,10 @@ const PharmacistShiftReport = () => {
     fetchReport();
   }, []);
 
-      const totalCash = report.reduce((s, r) => s + (r.cash_total || 0), 0);
-      const totalCard = report.reduce((s, r) => s + (r.card_total || 0), 0);
-      const totalUpi  = report.reduce((s, r) => s + (r.upi_total || 0), 0);
-      const totalBank = report.reduce((s, r) => s + (r.bank_total || 0), 0);
+  const totalCash = report.reduce((s, r) => s + (r.cash_total || 0), 0);
+  const totalCard = report.reduce((s, r) => s + (r.card_total || 0), 0);
+  const totalUpi = report.reduce((s, r) => s + (r.upi_total || 0), 0);
+  const totalBank = report.reduce((s, r) => s + (r.bank_total || 0), 0);
 
 
   return (
@@ -284,29 +288,29 @@ const PharmacistShiftReport = () => {
             ) : (
               report.map((row, i) => (
                 <Tr key={i}>
-              <Td>{row.shiftno}</Td>
-              <Td>{formatDate(row.starttime)}</Td>
-              <Td>{formatDate(row.endtime)}</Td>
-              <Td>₹ {row.cash_total}</Td>
-              <Td>₹ {row.card_total}</Td>
-              <Td>₹ {row.upi_total}</Td>
-              <Td>₹ {row.bank_total}</Td>
-              <Td>₹ {row.grand_total}</Td>
-              <Td>{row.collected_by}</Td>
-            </Tr>
+                  <Td>{row.shiftno}</Td>
+                  <Td>{formatDate(row.starttime)}</Td>
+                  <Td>{formatDate(row.endtime)}</Td>
+                  <Td>₹ {row.cash_total}</Td>
+                  <Td>₹ {row.card_total}</Td>
+                  <Td>₹ {row.upi_total}</Td>
+                  <Td>₹ {row.bank_total}</Td>
+                  <Td>₹ {row.grand_total}</Td>
+                  <Td>{row.collected_by}</Td>
+                </Tr>
 
               ))
             )}
 
             {report.length > 0 && (
               <FooterRow>
-          <Td colSpan="3">TOTAL</Td>
-          <Td>₹ {totalCash.toFixed(2)}</Td>
-          <Td>₹ {totalCard.toFixed(2)}</Td>
-          <Td>₹ {totalUpi.toFixed(2)}</Td>
-          <Td>₹ {totalBank.toFixed(2)}</Td>
-          <Td>₹ {(totalCash + totalBank).toFixed(2)}</Td>
-        </FooterRow>
+                <Td colSpan="3">TOTAL</Td>
+                <Td>₹ {totalCash.toFixed(2)}</Td>
+                <Td>₹ {totalCard.toFixed(2)}</Td>
+                <Td>₹ {totalUpi.toFixed(2)}</Td>
+                <Td>₹ {totalBank.toFixed(2)}</Td>
+                <Td>₹ {(totalCash + totalBank).toFixed(2)}</Td>
+              </FooterRow>
 
             )}
           </tbody>
